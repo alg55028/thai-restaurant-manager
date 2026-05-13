@@ -1188,6 +1188,8 @@ function connectFirebase(configStr, syncKey) {
     updateFbUI(true);
     setFbMsg('✅ Đang kết nối…');
     setSyncStatus('syncing');
+    // Push existing local data to Firebase on first connect
+    setTimeout(() => syncNowToFirebase(), 2000);
     return true;
   } catch(e) {
     setFbMsg('❌ Lỗi: ' + e.message);
