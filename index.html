@@ -1188,8 +1188,8 @@ function connectFirebase(configStr, syncKey) {
     updateFbUI(true);
     setFbMsg('✅ Đang kết nối…');
     setSyncStatus('syncing');
-    // Push existing local data to Firebase on first connect
-    setTimeout(() => syncNowToFirebase(), 2000);
+    // Push existing local data lên Firebase sau khi listener khởi động
+    // (listener tự xử lý nếu Firebase trống)
     return true;
   } catch(e) {
     setFbMsg('❌ Lỗi: ' + e.message);
@@ -1201,38 +1201,57 @@ function connectFirebase(configStr, syncKey) {
 function startFbListener() {
   if (_fbListening || !_fbRef) return;
   _fbListening = true;
+  let _firstLoad = true; // skip re-render on initial load
+
   _fbRef.on('value', snap => {
-    if (_fbIgnoreNext) { _fbIgnoreNext = false; return; }
+    if (_fbIgnoreNext) { _fbIgnoreNext = false; setSyncStatus('synced'); return; }
     const remote = snap.val();
-    if (remote && typeof remote === 'object') {
-      // Chỉ update nếu remote mới hơn local (tránh overwrite khi laptop đang nhập)
-      const remoteTs = remote._ts || 0;
-      const localTs  = S._ts  || 0;
-      if (remoteTs <= localTs) {
-        setSyncStatus('synced');
-        return; // data của mình mới hơn → bỏ qua
+
+    if (_firstLoad) {
+      _firstLoad = false;
+      // Lần đầu: chỉ merge data nếu Firebase có data mới hơn
+      if (remote && typeof remote === 'object' && (remote._ts||0) > (S._ts||0)) {
+        S = Object.assign({}, S, remote);
+        if (!S.foodPurchases) S.foodPurchases = [];
+        try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
+        updateAll(); refreshWeekUI();
+      } else if (!remote) {
+        // Firebase trống → push data local lên
+        syncNowToFirebase();
       }
-      S = Object.assign({}, S, remote);
-      if (!S.foodPurchases) S.foodPurchases = [];
-      try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
-      // Chỉ re-render tab đang mở, không reset toàn bộ UI
-      const activeTab = document.querySelector('.tab.active')?.id;
-      if (activeTab === 'tab-dashboard') updateAll();
-      else if (activeTab === 'tab-finance') renderFinanceTab();
-      else if (activeTab === 'tab-food') { loadFoodSpend(); updateAll(); }
-      else if (activeTab === 'tab-labour') renderLabTables();
-      else if (activeTab === 'tab-inventory') renderInventoryTab();
-      else updateAll();
+      setSyncStatus('synced');
+      setFbMsg('✅ Connected — data synced across devices');
+      return;
     }
+
+    // Các lần sau: chỉ update nếu remote THỰC SỰ mới hơn
+    if (!remote || typeof remote !== 'object') return;
+    const remoteTs = remote._ts || 0;
+    const localTs  = S._ts  || 0;
+    if (remoteTs <= localTs) { setSyncStatus('synced'); return; }
+
+    // Remote mới hơn → apply (thiết bị khác vừa save)
+    S = Object.assign({}, S, remote);
+    if (!S.foodPurchases) S.foodPurchases = [];
+    try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
+    // Chỉ update tab đang mở
+    const activeTab = document.querySelector('.tab.active')?.id;
+    if      (activeTab === 'tab-finance')   renderFinanceTab();
+    else if (activeTab === 'tab-food')      { loadFoodSpend(); updateAll(); }
+    else if (activeTab === 'tab-labour')    renderLabTables();
+    else if (activeTab === 'tab-inventory') renderInventoryTab();
+    else updateAll();
+
     setSyncStatus('synced');
     setFbMsg('✅ Connected — data synced across devices');
   }, err => {
     setSyncStatus('error');
     setFbMsg('❌ ' + err.message);
   });
-  // Connection state
+
+  // Connection state indicator only
   _fbDb.ref('.info/connected').on('value', snap => {
-    setSyncStatus(snap.val() ? 'synced' : 'offline');
+    if (!snap.val()) setSyncStatus('offline');
   });
 }
 
