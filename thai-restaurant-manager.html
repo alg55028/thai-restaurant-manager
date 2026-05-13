@@ -1205,14 +1205,24 @@ function startFbListener() {
     if (_fbIgnoreNext) { _fbIgnoreNext = false; return; }
     const remote = snap.val();
     if (remote && typeof remote === 'object') {
-      // Merge remote into local (remote wins for shared data)
+      // Chỉ update nếu remote mới hơn local (tránh overwrite khi laptop đang nhập)
+      const remoteTs = remote._ts || 0;
+      const localTs  = S._ts  || 0;
+      if (remoteTs <= localTs) {
+        setSyncStatus('synced');
+        return; // data của mình mới hơn → bỏ qua
+      }
       S = Object.assign({}, S, remote);
       if (!S.foodPurchases) S.foodPurchases = [];
       try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
-      updateAll();
-      refreshWeekUI();
-      if (document.getElementById('tab-finance').classList.contains('active')) renderFinanceTab();
-      if (document.getElementById('tab-food').classList.contains('active')) loadFoodSpend();
+      // Chỉ re-render tab đang mở, không reset toàn bộ UI
+      const activeTab = document.querySelector('.tab.active')?.id;
+      if (activeTab === 'tab-dashboard') updateAll();
+      else if (activeTab === 'tab-finance') renderFinanceTab();
+      else if (activeTab === 'tab-food') { loadFoodSpend(); updateAll(); }
+      else if (activeTab === 'tab-labour') renderLabTables();
+      else if (activeTab === 'tab-inventory') renderInventoryTab();
+      else updateAll();
     }
     setSyncStatus('synced');
     setFbMsg('✅ Connected — data synced across devices');
@@ -1268,12 +1278,13 @@ function syncNowToFirebase() {
   if (!_fbRef) return;
   clearTimeout(_fbSyncTimeout);
   _fbSyncTimeout = setTimeout(() => {
+    S._ts = Date.now(); // timestamp mỗi lần ghi
     setSyncStatus('syncing');
     _fbIgnoreNext = true;
     _fbRef.set(S)
       .then(() => setSyncStatus('synced'))
       .catch(() => { setSyncStatus('error'); _fbIgnoreNext = false; });
-  }, 1200); // 1.2s debounce — batches rapid changes
+  }, 1200);
 }
 
 function persist() {
