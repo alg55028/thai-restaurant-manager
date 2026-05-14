@@ -1209,26 +1209,31 @@ function startFbListener() {
 
     if (_firstLoad) {
       _firstLoad = false;
-      // Lần đầu: chỉ merge data nếu Firebase có data mới hơn
-      if (remote && typeof remote === 'object' && (remote._ts||0) > (S._ts||0)) {
-        S = Object.assign({}, S, remote);
-        if (!S.foodPurchases) S.foodPurchases = [];
-        try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
-        updateAll(); refreshWeekUI();
-      } else if (!remote) {
-        // Firebase trống → push data local lên
-        syncNowToFirebase();
+      if (remote && typeof remote === 'object') {
+        const remoteHasData = remote.weeks && Object.keys(remote.weeks||{}).length > 0;
+        const localHasData  = S.weeks  && Object.keys(S.weeks ||{}).length > 0;
+        // Lần đầu: ưu tiên Firebase nếu có data và không cũ hơn local
+        if (remoteHasData && (!localHasData || (remote._ts||0) >= (S._ts||0))) {
+          S = Object.assign({}, S, remote);
+          if (!S.foodPurchases) S.foodPurchases = [];
+          try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
+          updateAll(); refreshWeekUI();
+        } else if (localHasData && !remoteHasData) {
+          syncNowToFirebase(); // local có data, Firebase trống → push lên
+        }
+      } else {
+        syncNowToFirebase(); // Firebase trống → push local lên
       }
       setSyncStatus('synced');
       setFbMsg('✅ Connected — data synced across devices');
       return;
     }
 
-    // Các lần sau: chỉ update nếu remote THỰC SỰ mới hơn
+    // Các lần sau: bỏ qua chỉ khi remote CŨ HƠN local
     if (!remote || typeof remote !== 'object') return;
     const remoteTs = remote._ts || 0;
     const localTs  = S._ts  || 0;
-    if (remoteTs <= localTs) { setSyncStatus('synced'); return; }
+    if (remoteTs < localTs) { setSyncStatus('synced'); return; }
 
     // Remote mới hơn → apply (thiết bị khác vừa save)
     S = Object.assign({}, S, remote);
