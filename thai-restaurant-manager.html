@@ -10,6 +10,10 @@
 <meta name="apple-mobile-web-app-title" content="Thai Restaurant Manager">
 <link rel="manifest" id="pwa-manifest">
 <title>Restaurant Manager</title>
+<!-- Prevent browser from caching old versions of this app -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <!-- Firebase SDK loaded on-demand when user clicks Connect -->
 <style>
 :root{--p:#E85D26;--pd:#c44d1e;--bg:#0f1117;--s:#1a1d27;--s2:#22263a;--bd:#2e3347;--t:#e8eaf0;--tm:#7c82a0;--g:#22c55e;--r:#ef4444;--y:#f59e0b;--b:#3b82f6;--rad:10px}
@@ -1231,7 +1235,7 @@ function startFbListener() {
           S = Object.assign({}, S, remote);
           if (!S.foodPurchases) S.foodPurchases = [];
           try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
-          updateAll(); refreshWeekUI();
+          refreshWeekUI(); // refreshWeekUI calls updateAll() internally — no double render
         } else if (localHasData && !remoteHasData) {
           syncNowToFirebase(); // local có data, Firebase trống → push lên
         }
@@ -1302,13 +1306,19 @@ function loadSavedFbConfig() {
     const saved = localStorage.getItem('trm2_fb_cfg');
     if (!saved) return;
     const { config, syncKey } = JSON.parse(saved);
-    // Chỉ điền form — KHÔNG tự connect để tránh đơ UI khi load trang
+    // Fill form fields
     const ta = document.getElementById('fb-config-input');
     if (ta) ta.value = JSON.stringify(config, null, 2);
     const ki = document.getElementById('fb-sync-key');
     if (ki) ki.value = syncKey;
-    // Hiện nút reconnect thay vì tự động
-    setFbMsg('⚡ Config đã lưu — nhấn "Connect & Sync" để kết nối');
+    // Safe auto-reconnect: delay 2s so page is fully interactive first,
+    // THEN reconnect Firebase in the background (no UI freeze)
+    setSyncStatus('syncing');
+    setFbMsg('⏳ Đang kết nối lại Firebase (2s)…');
+    setTimeout(() => {
+      // Only reconnect if not already connected (user might have clicked manually)
+      if (!_fbRef) connectFirebase(JSON.stringify(config), syncKey);
+    }, 2000);
   } catch(e) {}
 }
 
