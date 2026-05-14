@@ -10,8 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Thai Restaurant Manager">
 <link rel="manifest" id="pwa-manifest">
 <title>Restaurant Manager</title>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<!-- Firebase SDK loaded on-demand when user clicks Connect -->
 <style>
 :root{--p:#E85D26;--pd:#c44d1e;--bg:#0f1117;--s:#1a1d27;--s2:#22263a;--bd:#2e3347;--t:#e8eaf0;--tm:#7c82a0;--g:#22c55e;--r:#ef4444;--y:#f59e0b;--b:#3b82f6;--rad:10px}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1167,35 +1166,50 @@ function fbKey(syncKey) {
   return 'r' + Math.abs(h).toString(36);
 }
 
+function loadFirebaseSDK() {
+  return new Promise((resolve, reject) => {
+    if (window.firebase && window.firebase.database) { resolve(); return; }
+    setFbMsg('⏳ Đang tải Firebase SDK…');
+    const s1 = document.createElement('script');
+    s1.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
+    s1.onload = () => {
+      const s2 = document.createElement('script');
+      s2.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js';
+      s2.onload = resolve;
+      s2.onerror = () => reject(new Error('Không load được Firebase Database SDK'));
+      document.head.appendChild(s2);
+    };
+    s1.onerror = () => reject(new Error('Không load được Firebase SDK'));
+    document.head.appendChild(s1);
+  });
+}
+
 function connectFirebase(configStr, syncKey) {
+  let cfg;
   try {
-    const cfg = typeof configStr === 'string' ? JSON.parse(configStr) : configStr;
-    if (!cfg.apiKey || !cfg.databaseURL) {
-      setFbMsg('❌ Config thiếu apiKey hoặc databaseURL'); return false;
-    }
-    if (!syncKey || syncKey.length < 6) {
-      setFbMsg('❌ Sync Key phải ít nhất 6 ký tự'); return false;
-    }
-    // Init Firebase (avoid re-init)
+    cfg = typeof configStr === 'string' ? JSON.parse(configStr) : configStr;
+  } catch(e) { setFbMsg('❌ Config JSON không hợp lệ'); return; }
+  if (!cfg.apiKey || !cfg.databaseURL) {
+    setFbMsg('❌ Config thiếu apiKey hoặc databaseURL'); return;
+  }
+  if (!syncKey || syncKey.length < 6) {
+    setFbMsg('❌ Sync Key phải ít nhất 6 ký tự'); return;
+  }
+  setSyncStatus('syncing');
+  // Load SDK on-demand → then connect
+  loadFirebaseSDK().then(() => {
     if (_fbApp) { try { _fbApp.delete(); } catch(e){} }
     _fbApp = firebase.initializeApp(cfg, 'trm-' + Date.now());
     _fbDb  = firebase.database(_fbApp);
     _fbRef = _fbDb.ref('trm2/' + fbKey(syncKey));
-    // Save config to localStorage (separate from S)
     localStorage.setItem('trm2_fb_cfg', JSON.stringify({ config: cfg, syncKey }));
-    // Start listening
     startFbListener();
     updateFbUI(true);
     setFbMsg('✅ Đang kết nối…');
-    setSyncStatus('syncing');
-    // Push existing local data lên Firebase sau khi listener khởi động
-    // (listener tự xử lý nếu Firebase trống)
-    return true;
-  } catch(e) {
-    setFbMsg('❌ Lỗi: ' + e.message);
+  }).catch(e => {
+    setFbMsg('❌ ' + e.message);
     setSyncStatus('error');
-    return false;
-  }
+  });
 }
 
 function startFbListener() {
