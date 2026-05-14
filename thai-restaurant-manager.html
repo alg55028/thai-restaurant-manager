@@ -19,7 +19,7 @@
 :root{--p:#E85D26;--pd:#c44d1e;--bg:#0f1117;--s:#1a1d27;--s2:#22263a;--bd:#2e3347;--t:#e8eaf0;--tm:#7c82a0;--g:#22c55e;--r:#ef4444;--y:#f59e0b;--b:#3b82f6;--rad:10px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
-header{background:var(--s);border-bottom:1px solid var(--bd);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+header{background:var(--s);border-bottom:1px solid var(--bd);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .logo{display:flex;align-items:center;gap:10px}
 .logo-icon{width:36px;height:36px;background:var(--p);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
 .logo-text{font-size:16px;font-weight:700}
@@ -185,6 +185,8 @@ tr:hover td{background:var(--s2)}
 </head>
 <body>
 
+<!-- sticky-bar: header + nav scroll together as one unit, always on top -->
+<div id="sticky-bar" style="position:sticky;top:0;z-index:100">
 <header>
   <div class="logo">
     <div class="logo-icon">🍜</div>
@@ -212,6 +214,7 @@ tr:hover td{background:var(--s2)}
   <button id="nav-finance">💰 Finance</button>
   <button id="nav-setup">⚙️ Setup</button>
 </nav>
+</div>
 
 <main>
 
