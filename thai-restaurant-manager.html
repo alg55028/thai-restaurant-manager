@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Auto force-reload when a new version is deployed (works for iOS PWA Home Screen apps too) -->
+<script>
+(function(){
+  var V='20260514-2';
+  if(localStorage.getItem('_trm_ver')!==V){
+    localStorage.setItem('_trm_ver',V);
+    var url=location.pathname+'?r='+V;
+    if(location.search!=='?r='+V) location.replace(url);
+  }
+})();
+</script>
 <meta name="theme-color" content="#E85D26">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
