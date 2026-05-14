@@ -1283,13 +1283,13 @@ function loadSavedFbConfig() {
     const saved = localStorage.getItem('trm2_fb_cfg');
     if (!saved) return;
     const { config, syncKey } = JSON.parse(saved);
-    // Show config in textarea (masked)
+    // Chỉ điền form — KHÔNG tự connect để tránh đơ UI khi load trang
     const ta = document.getElementById('fb-config-input');
     if (ta) ta.value = JSON.stringify(config, null, 2);
     const ki = document.getElementById('fb-sync-key');
     if (ki) ki.value = syncKey;
-    // Auto-reconnect
-    connectFirebase(config, syncKey);
+    // Hiện nút reconnect thay vì tự động
+    setFbMsg('⚡ Config đã lưu — nhấn "Connect & Sync" để kết nối');
   } catch(e) {}
 }
 
@@ -4927,7 +4927,7 @@ function init() {
     connectFirebase(cfg, key);
   });
   document.getElementById('btn-fb-disconnect').addEventListener('click', disconnectFirebase);
-  // Auto-reconnect if previously configured
+  // Auto-reconnect: chỉ load config vào form, KHÔNG tự connect
   loadSavedFbConfig();
 
   // ── GST toggle: live update dashboard without requiring Save ──
