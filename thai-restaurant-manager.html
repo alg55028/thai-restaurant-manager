@@ -352,9 +352,26 @@ tr:hover td{background:var(--s2)}
   </div>
 
   <div class="card">
-    <div class="sh"><div class="stitle">🧄 Ingredient Prices</div><div style="display:flex;gap:6px"><button class="btn btn-g btn-sm" id="btn-stock-presets">📦 Load Presets</button><button class="btn btn-p btn-sm" id="btn-add-ing">+ Add Ingredient</button></div></div>
-    <div class="twrap"><table><thead><tr><th>Ingredient</th><th>Unit</th><th>Cost / Unit</th><th></th></tr></thead>
-    <tbody id="ing-body"><tr><td colspan="4" style="color:var(--tm);text-align:center;padding:20px">No ingredients yet.</td></tr></tbody></table></div>
+    <!-- Normal view -->
+    <div id="ing-normal-view">
+      <div class="sh"><div class="stitle">🧄 Ingredient Prices</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-g btn-sm" id="btn-stock-presets">📦 Load Presets</button><button class="btn btn-g btn-sm" id="btn-bulk-price">💰 Update Prices</button><button class="btn btn-p btn-sm" id="btn-add-ing">+ Add Ingredient</button></div></div>
+      <div class="twrap"><table><thead><tr><th>Ingredient</th><th>Unit</th><th>Cost / Unit</th><th></th></tr></thead>
+      <tbody id="ing-body"><tr><td colspan="4" style="color:var(--tm);text-align:center;padding:20px">No ingredients yet.</td></tr></tbody></table></div>
+    </div>
+    <!-- Bulk price edit panel -->
+    <div id="bulk-price-panel" style="display:none">
+      <div class="sh" style="margin-bottom:12px">
+        <div>
+          <div class="stitle">💰 Update Prices</div>
+          <div class="tmuted" style="font-size:12px;margin-top:3px">Tab để di chuyển giữa các ô · Enter để lưu</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-g btn-sm" id="btn-cancel-bulk">✕ Huỷ</button>
+          <button class="btn btn-p btn-sm" id="btn-save-bulk">💾 Save All</button>
+        </div>
+      </div>
+      <div id="bulk-price-rows"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -2213,6 +2230,73 @@ function renderIngTable() {
       <button class="btn btn-d btn-sm" data-del-ing="${ing.id}" title="Delete">✕</button>
     </td>
   </tr>`).join('');
+}
+
+// ─────────────────────────────────────────────
+//  BULK PRICE UPDATE
+// ─────────────────────────────────────────────
+function openBulkPriceEdit() {
+  if (!S.ingredients.length) { toast('Chưa có ingredient nào'); return; }
+  document.getElementById('ing-normal-view').style.display = 'none';
+  document.getElementById('bulk-price-panel').style.display = '';
+  document.getElementById('bulk-price-rows').innerHTML = S.ingredients.map((ing, i) => `
+    <div style="display:grid;grid-template-columns:1fr 60px 130px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)">
+      <div style="font-size:13px;font-weight:500">${esc(ing.name)}</div>
+      <div style="font-size:12px;color:var(--tm)">${ing.unit}</div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="color:var(--tm);font-size:13px">$</span>
+        <input type="number" min="0" step="0.01"
+          class="bulk-price-input"
+          data-ing-id="${ing.id}"
+          data-orig="${ing.cost}"
+          value="${ing.cost}"
+          style="background:var(--s2);border:1px solid var(--bd);color:var(--t);border-radius:6px;padding:6px 8px;font-size:14px;width:88px;text-align:right;font-family:monospace"
+          placeholder="0.00">
+      </div>
+    </div>`).join('');
+  // Highlight changed cells on input
+  document.querySelectorAll('.bulk-price-input').forEach(inp => {
+    inp.addEventListener('input', function() {
+      const changed = parseFloat(this.value) !== parseFloat(this.dataset.orig);
+      this.style.borderColor = changed ? 'var(--y)' : 'var(--bd)';
+      this.style.color = changed ? 'var(--y)' : 'var(--t)';
+    });
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveBulkPrices(); }
+    });
+  });
+  setTimeout(() => { const f = document.querySelector('.bulk-price-input'); if(f) { f.focus(); f.select(); } }, 50);
+}
+
+function saveBulkPrices() {
+  let changed = 0;
+  document.querySelectorAll('.bulk-price-input').forEach(inp => {
+    const id = parseInt(inp.dataset.ingId);
+    const newCost = Math.round((parseFloat(inp.value)||0) * 100) / 100;
+    const ing = S.ingredients.find(i => i.id === id);
+    if (ing && ing.cost !== newCost) {
+      // Keep price history for the Price History tab
+      if (!ing.prevCost) ing.prevCost = {};
+      ing.prevCost[new Date().toISOString().split('T')[0]] = ing.cost;
+      ing.cost = newCost;
+      changed++;
+    }
+  });
+  closeBulkPriceEdit();
+  if (changed > 0) {
+    persist();
+    renderIngTable();
+    renderRecipeTable(); // re-calc plate costs
+    updateAll();
+    toast(`✅ Đã cập nhật ${changed} giá`);
+  } else {
+    toast('Không có thay đổi');
+  }
+}
+
+function closeBulkPriceEdit() {
+  document.getElementById('bulk-price-panel').style.display = 'none';
+  document.getElementById('ing-normal-view').style.display = '';
 }
 
 function populateRecipeCats(currentCat) {
@@ -5093,6 +5177,9 @@ function init() {
 
   // ── Food: ingredient modal ──
   document.getElementById('btn-add-ing').addEventListener('click', () => openIngModal());
+  document.getElementById('btn-bulk-price').addEventListener('click', openBulkPriceEdit);
+  document.getElementById('btn-save-bulk').addEventListener('click', saveBulkPrices);
+  document.getElementById('btn-cancel-bulk').addEventListener('click', closeBulkPriceEdit);
   document.getElementById('btn-save-ing').addEventListener('click', saveIng);
   document.getElementById('btn-cancel-ing').addEventListener('click', () => closeModal('modal-ing'));
   document.getElementById('ing-body').addEventListener('click', function(e) {
