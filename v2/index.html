@@ -354,7 +354,7 @@ tr:hover td{background:var(--s2)}
   <div class="card">
     <!-- Normal view -->
     <div id="ing-normal-view">
-      <div class="sh"><div class="stitle">🧄 Ingredient Prices</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-g btn-sm" id="btn-stock-presets">📦 Load Presets</button><button class="btn btn-g btn-sm" id="btn-bulk-price">💰 Update Prices</button><button class="btn btn-p btn-sm" id="btn-add-ing">+ Add Ingredient</button></div></div>
+      <div class="sh"><div class="stitle">🧄 Ingredient Prices</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-g btn-sm" id="btn-stock-presets">📦 Load Presets</button><button class="btn btn-g btn-sm" id="btn-bulk-price">💰 Update Prices</button><button class="btn btn-g btn-sm" id="btn-scan-invoice">📸 Scan Invoice</button><button class="btn btn-p btn-sm" id="btn-add-ing">+ Add Ingredient</button></div></div>
       <div class="twrap"><table><thead><tr><th>Ingredient</th><th>Unit</th><th>Cost / Unit</th><th></th></tr></thead>
       <tbody id="ing-body"><tr><td colspan="4" style="color:var(--tm);text-align:center;padding:20px">No ingredients yet.</td></tr></tbody></table></div>
     </div>
@@ -1112,6 +1112,46 @@ tr:hover td{background:var(--s2)}
 </div>
 
 <!-- STOCK PRESETS MODAL -->
+<!-- ── Invoice Scanner Modal ── -->
+<div class="modal-ov" id="modal-scan">
+  <div class="modal" style="max-width:560px;width:100%">
+    <!-- Step 1: Upload -->
+    <div id="scan-s1">
+      <div class="modal-title">📸 Scan Supplier Invoice</div>
+      <div style="text-align:center;padding:16px 0 10px">
+        <div style="font-size:52px;margin-bottom:10px">🧾</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px">Chụp hoặc upload ảnh hóa đơn</div>
+        <div class="tmuted" style="font-size:12px;margin-bottom:20px">Hóa đơn in rõ nét cho kết quả tốt nhất<br>App đọc tên hàng + giá, anh kiểm tra lại trước khi lưu</div>
+        <label for="scan-img-input" class="btn btn-p" style="cursor:pointer;display:inline-flex;gap:6px">📷 Chọn ảnh / Chụp hình</label>
+        <input type="file" id="scan-img-input" accept="image/*" capture="environment" style="display:none">
+      </div>
+      <div class="bgrp"><button class="btn btn-g" onclick="closeModal('modal-scan')">Đóng</button></div>
+    </div>
+    <!-- Step 2: Processing -->
+    <div id="scan-s2" style="display:none">
+      <div class="modal-title">⚙️ Đang đọc hóa đơn...</div>
+      <div style="padding:24px 0">
+        <div id="scan-prog-txt" class="tmuted" style="font-size:13px;text-align:center;margin-bottom:12px">Đang tải OCR engine...</div>
+        <div style="background:var(--s2);border-radius:4px;height:8px;overflow:hidden">
+          <div id="scan-prog-bar" style="height:100%;background:var(--p);width:0%;transition:width .4s;border-radius:4px"></div>
+        </div>
+        <div class="tmuted" style="font-size:11px;text-align:center;margin-top:10px">Lần đầu tải ~20-30s · Lần sau nhanh hơn</div>
+      </div>
+    </div>
+    <!-- Step 3: Review -->
+    <div id="scan-s3" style="display:none">
+      <div class="modal-title">✅ Kiểm tra kết quả OCR</div>
+      <div class="tmuted" style="font-size:12px;margin-bottom:12px">Chọn ingredient tương ứng với từng dòng đọc được. Tick "Bỏ" để bỏ qua dòng đó.</div>
+      <div id="scan-review-wrap" style="max-height:340px;overflow-y:auto;margin-bottom:4px"></div>
+      <div class="bgrp">
+        <button class="btn btn-g btn-sm" id="btn-scan-retry">↩ Thử lại</button>
+        <button class="btn btn-g" onclick="closeModal('modal-scan')">Huỷ</button>
+        <button class="btn btn-p" id="btn-scan-save">💾 Lưu giá</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-ov" id="modal-stock-presets">
   <div class="modal" style="max-width:640px;padding:0;display:flex;flex-direction:column;max-height:92vh">
     <div style="padding:18px 20px 12px;border-bottom:1px solid var(--bd)">
@@ -2330,6 +2370,152 @@ function saveBulkPrices() {
 function closeBulkPriceEdit() {
   document.getElementById('bulk-price-panel').style.display = 'none';
   document.getElementById('ing-normal-view').style.display = '';
+}
+
+// ─────────────────────────────────────────────
+//  INVOICE SCANNER — Tesseract.js OCR
+// ─────────────────────────────────────────────
+function openInvoiceScan() {
+  if (!S.ingredients.length) return toast('Thêm ingredients trước khi scan');
+  showScanStep(1);
+  openModal('modal-scan');
+}
+
+function showScanStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('scan-s'+i);
+    if (el) el.style.display = (i===n) ? '' : 'none';
+  });
+}
+
+async function runOCR(file) {
+  showScanStep(2);
+  try {
+    if (!window.Tesseract) {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.onload = res; s.onerror = () => rej(new Error('Không tải được Tesseract.js'));
+        document.head.appendChild(s);
+      });
+    }
+    const result = await Tesseract.recognize(file, 'eng', {
+      logger: m => {
+        const bar = document.getElementById('scan-prog-bar');
+        const txt = document.getElementById('scan-prog-txt');
+        if (!bar || !txt) return;
+        if (m.status === 'loading tesseract core') { txt.textContent = 'Đang tải OCR engine...'; bar.style.width = '15%'; }
+        else if (m.status === 'initializing tesseract') { txt.textContent = 'Đang khởi động...'; bar.style.width = '30%'; }
+        else if (m.status === 'loading language traineddata') { txt.textContent = 'Đang tải ngôn ngữ English...'; bar.style.width = '50%'; }
+        else if (m.status === 'initializing api') { txt.textContent = 'Chuẩn bị đọc...'; bar.style.width = '65%'; }
+        else if (m.status === 'recognizing text') {
+          const pct = Math.round(m.progress * 100);
+          txt.textContent = `Đang đọc... ${pct}%`;
+          bar.style.width = (65 + pct * 0.35) + '%';
+        }
+      }
+    });
+    const items = parseInvoiceText(result.data.text);
+    showScanReview(items);
+  } catch(e) {
+    showScanStep(1);
+    toast('❌ ' + (e.message || 'Không đọc được ảnh'));
+  }
+}
+
+function parseInvoiceText(rawText) {
+  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 3);
+  const items = [], seen = new Set();
+  lines.forEach(line => {
+    // Match price: $12.50 or 12.50 (with dot or comma as decimal sep)
+    const pm = line.match(/\$?\s*(\d{1,5}[.,]\d{2})\b/);
+    if (!pm) return;
+    const price = parseFloat(pm[1].replace(',', '.'));
+    if (price < 0.5 || price > 9999) return;
+    // Name = text before price, strip special chars
+    const raw = line.substring(0, line.indexOf(pm[0])).trim();
+    const name = raw.replace(/[|\\\/\[\]{}*@^~`"<>]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!name || name.length < 2) return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    const matched = fuzzyMatchIng(name);
+    items.push({ rawName: name, price, ingId: matched ? matched.id : '' });
+  });
+  return items;
+}
+
+function fuzzyMatchIng(name) {
+  if (!S.ingredients.length) return null;
+  const n = name.toLowerCase();
+  // 1. Exact
+  let m = S.ingredients.find(i => i.name.toLowerCase() === n); if (m) return m;
+  // 2. One contains the other
+  m = S.ingredients.find(i => n.includes(i.name.toLowerCase()) || i.name.toLowerCase().includes(n)); if (m) return m;
+  // 3. Any significant word match
+  const words = n.split(/\s+/).filter(w => w.length > 2);
+  m = S.ingredients.find(i => words.some(w => i.name.toLowerCase().includes(w)));
+  return m || null;
+}
+
+function showScanReview(items) {
+  const wrap = document.getElementById('scan-review-wrap');
+  if (!items.length) {
+    wrap.innerHTML = '<div class="alert aly"><span class="al-icon">⚠️</span><div>Không tìm thấy dòng giá nào. Thử ảnh sáng hơn, chụp thẳng và gần hơn.</div></div>';
+    showScanStep(3); return;
+  }
+  const ingOpts = '<option value="">— Bỏ qua —</option>' +
+    S.ingredients.map(i => `<option value="${i.id}">${esc(i.name)} (hiện $${i.cost.toFixed(2)}/${i.unit})</option>`).join('');
+  wrap.innerHTML = `
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead><tr style="background:var(--s2)">
+        <th style="padding:7px 6px;text-align:left;color:var(--tm);font-weight:600">Đọc được từ hóa đơn</th>
+        <th style="padding:7px 6px;text-align:left;color:var(--tm);font-weight:600">Khớp với ingredient</th>
+        <th style="padding:7px 6px;text-align:right;color:var(--tm);font-weight:600">Giá mới</th>
+        <th style="padding:7px 6px;text-align:center;color:var(--tm);font-weight:600">Bỏ</th>
+      </tr></thead>
+      <tbody>${items.map((it, i) => `
+        <tr style="border-bottom:1px solid var(--bd)">
+          <td style="padding:6px;font-size:11px;color:var(--tm);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(it.rawName)}">${esc(it.rawName)}</td>
+          <td style="padding:4px 6px">
+            <select data-si="${i}" style="background:var(--s2);border:1px solid ${it.ingId?'var(--g)':'var(--y)'};color:var(--t);border-radius:4px;padding:4px 5px;font-size:11px;width:100%">
+              ${ingOpts.replace(`value="${it.ingId}"`,`value="${it.ingId}" selected`)}
+            </select>
+          </td>
+          <td style="padding:4px 6px;text-align:right">
+            <input type="number" data-sp="${i}" value="${it.price}" min="0" step="0.01"
+              style="background:var(--s2);border:1px solid var(--bd);color:var(--y);border-radius:4px;padding:4px 6px;font-size:12px;width:70px;text-align:right;font-family:monospace">
+          </td>
+          <td style="padding:4px;text-align:center">
+            <input type="checkbox" data-sk="${i}">
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  showScanStep(3);
+}
+
+function saveScanResults() {
+  let saved = 0;
+  document.querySelectorAll('[data-si]').forEach(sel => {
+    const i = sel.dataset.si;
+    if (document.querySelector(`[data-sk="${i}"]`)?.checked) return;
+    const ingId = parseInt(sel.value); if (!ingId) return;
+    const newCost = Math.round((parseFloat(document.querySelector(`[data-sp="${i}"]`)?.value)||0)*100)/100;
+    if (newCost <= 0) return;
+    const ing = S.ingredients.find(x => x.id === ingId);
+    if (ing && ing.cost !== newCost) {
+      if (!ing.prevCost) ing.prevCost = {};
+      ing.prevCost[new Date().toISOString().split('T')[0]] = ing.cost;
+      ing.cost = newCost; saved++;
+    }
+  });
+  if (saved > 0) {
+    const rx = recalcRecipeCosts();
+    persist(); renderIngTable(); renderRecipeTable(); updateAll();
+    toast(`✅ ${saved} giá · ${rx} món tính lại`);
+  } else { toast('Không có thay đổi nào được lưu'); }
+  closeModal('modal-scan');
 }
 
 function populateRecipeCats(currentCat) {
@@ -5213,6 +5399,12 @@ function init() {
   document.getElementById('btn-bulk-price').addEventListener('click', openBulkPriceEdit);
   document.getElementById('btn-save-bulk').addEventListener('click', saveBulkPrices);
   document.getElementById('btn-cancel-bulk').addEventListener('click', closeBulkPriceEdit);
+  document.getElementById('btn-scan-invoice').addEventListener('click', openInvoiceScan);
+  document.getElementById('btn-scan-save').addEventListener('click', saveScanResults);
+  document.getElementById('btn-scan-retry').addEventListener('click', () => showScanStep(1));
+  document.getElementById('scan-img-input').addEventListener('change', function() {
+    if (this.files && this.files[0]) runOCR(this.files[0]);
+  });
   document.getElementById('btn-save-ing').addEventListener('click', saveIng);
   document.getElementById('btn-cancel-ing').addEventListener('click', () => closeModal('modal-ing'));
   document.getElementById('ing-body').addEventListener('click', function(e) {
