@@ -817,6 +817,31 @@ tr:hover td{background:var(--s2)}
     <div id="fb-status-msg" style="margin-top:10px;font-size:12px;color:var(--tm)"></div>
   </div>
 
+  <!-- TELEGRAM WEEKLY REPORT -->
+  <div class="card" id="telegram-card">
+    <div class="ctitle">📲 Telegram Weekly Report <span id="tg-badge" class="badge bo" style="margin-left:auto">Not configured</span></div>
+    <div class="alert alb" style="margin-bottom:14px">
+      <span class="al-icon">🔐</span>
+      <div style="font-size:12px">Bot token được lưu <strong>chỉ trên máy này</strong>. Bấm "Send Report" bất cứ lúc nào để gửi tóm tắt tuần vào Telegram.</div>
+    </div>
+    <div class="fgrid" style="margin-bottom:14px">
+      <div class="fg">
+        <label>Bot Token</label>
+        <input type="password" id="tg-token" placeholder="123456789:ABCdef...">
+      </div>
+      <div class="fg">
+        <label>Chat ID</label>
+        <input type="text" id="tg-chat-id" placeholder="8500012494">
+      </div>
+    </div>
+    <div class="bgrp">
+      <button class="btn btn-p" id="btn-tg-save">💾 Save Config</button>
+      <button class="btn btn-g" id="btn-tg-test">🧪 Test</button>
+      <button class="btn btn-g" id="btn-tg-send">📲 Send Weekly Report</button>
+    </div>
+    <div id="tg-status" style="margin-top:10px;font-size:12px;color:var(--tm)"></div>
+  </div>
+
   <!-- BACKUP & RESTORE -->
   <div class="card">
     <div class="ctitle">☁️ Data Backup &amp; Restore</div>
@@ -4950,6 +4975,113 @@ window.addEventListener('appinstalled', function() {
 // ─────────────────────────────────────────────
 //  WHATSAPP WEEKLY SUMMARY  (WOW #4)
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+//  TELEGRAM WEEKLY REPORT
+// ─────────────────────────────────────────────
+function loadTgConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('trm2_tg') || '{}');
+    if (cfg.token) { document.getElementById('tg-token').value = cfg.token; setTgBadge(true); }
+    if (cfg.chatId) document.getElementById('tg-chat-id').value = cfg.chatId;
+  } catch(e) {}
+}
+
+function setTgBadge(ok) {
+  const b = document.getElementById('tg-badge');
+  if (!b) return;
+  b.textContent = ok ? 'Configured ✓' : 'Not configured';
+  b.className = 'badge ' + (ok ? 'bg' : 'bo');
+}
+
+function saveTgConfig() {
+  const token  = document.getElementById('tg-token').value.trim();
+  const chatId = document.getElementById('tg-chat-id').value.trim();
+  if (!token || !chatId) return toast('Điền đủ Token và Chat ID');
+  localStorage.setItem('trm2_tg', JSON.stringify({ token, chatId }));
+  setTgBadge(true);
+  toast('✅ Đã lưu Telegram config');
+}
+
+async function tgRequest(token, chatId, text) {
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
+  });
+  const data = await r.json();
+  if (!data.ok) throw new Error(data.description || 'Telegram API error');
+  return data;
+}
+
+function getTgCreds() {
+  try { return JSON.parse(localStorage.getItem('trm2_tg') || '{}'); } catch(e) { return {}; }
+}
+
+async function testTelegram() {
+  const { token, chatId } = getTgCreds();
+  if (!token || !chatId) return toast('Lưu config trước');
+  const st = document.getElementById('tg-status');
+  st.textContent = '⏳ Đang gửi test...';
+  try {
+    await tgRequest(token, chatId, '✅ <b>Thai Restaurant Manager</b>\nKết nối Telegram thành công!');
+    st.textContent = '✅ Test thành công — kiểm tra Telegram của anh';
+  } catch(e) {
+    st.textContent = '❌ ' + e.message;
+  }
+}
+
+async function sendTelegramReport() {
+  const { token, chatId } = getTgCreds();
+  if (!token || !chatId) return toast('Vào Setup → Telegram để cấu hình trước');
+  const { gross, net: netRev, delivery, fee } = calcRev();
+  const { total: labTot } = calcLabTotals();
+  const wd    = weekData();
+  const food  = wd.food || 0;
+  const s     = S.setup;
+  const fixed = s.rent + s.util + s.ins + s.admin + s.mkt + s.other;
+  const profit = netRev - labTot - food - fixed;
+  const labPct  = netRev > 0 ? labTot / netRev * 100 : 0;
+  const foodPct = netRev > 0 ? food / netRev * 100 : 0;
+  const profPct = netRev > 0 ? profit / netRev * 100 : 0;
+  const lcTgt = s.lc || 32, fcTgt = s.fc || 30;
+  const icon = (val, tgt) => val <= tgt ? '✅' : val <= tgt * 1.1 ? '⚠️' : '🔴';
+  // Week range
+  const mon = new Date(S.weekKey + 'T00:00:00');
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  const fd = d => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  const weekRange = fd(mon) + ' – ' + fd(sun);
+
+  const msg = [
+    `📊 <b>Weekly Report — ${esc(s.name || 'Restaurant')}</b>`,
+    `📅 ${weekRange}\n`,
+    `💰 <b>Revenue</b>`,
+    `  Gross: <b>$${gross.toFixed(2)}</b>${delivery > 0 ? ` (incl. $${delivery.toFixed(2)} delivery)` : ''}`,
+    delivery > 0 ? `  Delivery fees: -$${fee.toFixed(2)}` : '',
+    `  Net: <b>$${netRev.toFixed(2)}</b>\n`,
+    `📦 <b>Costs</b>`,
+    `  ${icon(foodPct, fcTgt)} Food: $${food.toFixed(2)} <b>(${foodPct.toFixed(1)}%)</b> · target ${fcTgt}%`,
+    `  ${icon(labPct, lcTgt)} Labour: $${labTot.toFixed(2)} <b>(${labPct.toFixed(1)}%)</b> · target ${lcTgt}%`,
+    `  🏠 Overheads: $${fixed.toFixed(2)}\n`,
+    `━━━━━━━━━━━━━`,
+    profit >= 0
+      ? `💚 <b>Net Profit: $${profit.toFixed(2)} (${profPct.toFixed(1)}%)</b>`
+      : `🔴 <b>Net Loss: -$${Math.abs(profit).toFixed(2)} (${Math.abs(profPct).toFixed(1)}%)</b>`,
+    `\n<i>Sent from Thai Restaurant Manager</i>`
+  ].filter(Boolean).join('\n');
+
+  const st = document.getElementById('tg-status');
+  if (st) st.textContent = '⏳ Đang gửi...';
+  try {
+    await tgRequest(token, chatId, msg);
+    if (st) st.textContent = '✅ Đã gửi vào Telegram!';
+    toast('📲 Weekly report đã gửi!');
+  } catch(e) {
+    if (st) st.textContent = '❌ ' + e.message;
+    toast('❌ Gửi thất bại: ' + e.message);
+  }
+}
+
 function generateWhatsAppSummary() {
   const { gross, net: netRev, dinein, delivery, fee } = calcRev();
   if (!gross) return toast('No revenue data for this week yet');
@@ -5399,6 +5531,11 @@ function init() {
   document.getElementById('btn-bulk-price').addEventListener('click', openBulkPriceEdit);
   document.getElementById('btn-save-bulk').addEventListener('click', saveBulkPrices);
   document.getElementById('btn-cancel-bulk').addEventListener('click', closeBulkPriceEdit);
+  // ── Telegram ──
+  document.getElementById('btn-tg-save').addEventListener('click', saveTgConfig);
+  document.getElementById('btn-tg-test').addEventListener('click', testTelegram);
+  document.getElementById('btn-tg-send').addEventListener('click', sendTelegramReport);
+  loadTgConfig();
   document.getElementById('btn-scan-invoice').addEventListener('click', openInvoiceScan);
   document.getElementById('btn-scan-save').addEventListener('click', saveScanResults);
   document.getElementById('btn-scan-retry').addEventListener('click', () => showScanStep(1));
