@@ -2204,14 +2204,23 @@ function saveIng() {
   if (!name || isNaN(cost)) return toast('Fill in name and price');
   if (_editIngId) {
     const ing = S.ingredients.find(i => i.id === _editIngId);
-    if (ing) { ing.name = name; ing.unit = unit; ing.cost = cost; }
-    toast('Ingredient updated ✓');
+    if (ing) {
+      const priceChanged = ing.cost !== cost;
+      if (priceChanged) {
+        if (!ing.prevCost) ing.prevCost = {};
+        ing.prevCost[new Date().toISOString().split('T')[0]] = ing.cost;
+      }
+      ing.name = name; ing.unit = unit; ing.cost = cost;
+      const recipesUpdated = priceChanged ? recalcRecipeCosts() : 0;
+      toast(recipesUpdated > 0 ? `✅ Saved · ${recipesUpdated} món được tính lại` : 'Ingredient updated ✓');
+    }
   } else {
     S.ingredients.push({ id: Date.now(), name, unit, cost });
     toast('Ingredient added ✓');
   }
   persist();
   renderIngTable();
+  if (S.recipes.length) renderRecipeTable();
   closeModal('modal-ing');
 }
 function delIng(id) {
@@ -2268,6 +2277,27 @@ function openBulkPriceEdit() {
   setTimeout(() => { const f = document.querySelector('.bulk-price-input'); if(f) { f.focus(); f.select(); } }, 50);
 }
 
+function recalcRecipeCosts() {
+  let updated = 0;
+  (S.recipes||[]).forEach(recipe => {
+    if (!recipe.ingredients || !recipe.ingredients.length) return;
+    let newCost = 0, hasLink = false;
+    recipe.ingredients.forEach(row => {
+      if (!row.ingId || !row.qty) return;
+      const ing = S.ingredients.find(i => i.id == row.ingId);
+      if (ing) { newCost += ing.cost * row.qty; hasLink = true; }
+    });
+    if (hasLink) {
+      newCost = Math.round(newCost * 100) / 100;
+      if (Math.abs(newCost - recipe.plateCost) >= 0.01) {
+        recipe.plateCost = newCost;
+        updated++;
+      }
+    }
+  });
+  return updated;
+}
+
 function saveBulkPrices() {
   let changed = 0;
   document.querySelectorAll('.bulk-price-input').forEach(inp => {
@@ -2275,7 +2305,6 @@ function saveBulkPrices() {
     const newCost = Math.round((parseFloat(inp.value)||0) * 100) / 100;
     const ing = S.ingredients.find(i => i.id === id);
     if (ing && ing.cost !== newCost) {
-      // Keep price history for the Price History tab
       if (!ing.prevCost) ing.prevCost = {};
       ing.prevCost[new Date().toISOString().split('T')[0]] = ing.cost;
       ing.cost = newCost;
@@ -2284,11 +2313,15 @@ function saveBulkPrices() {
   });
   closeBulkPriceEdit();
   if (changed > 0) {
+    const recipesUpdated = recalcRecipeCosts();
     persist();
     renderIngTable();
-    renderRecipeTable(); // re-calc plate costs
+    renderRecipeTable();
     updateAll();
-    toast(`✅ Đã cập nhật ${changed} giá`);
+    const msg = recipesUpdated > 0
+      ? `✅ ${changed} giá · ${recipesUpdated} món được tính lại`
+      : `✅ Đã cập nhật ${changed} giá`;
+    toast(msg);
   } else {
     toast('Không có thay đổi');
   }
