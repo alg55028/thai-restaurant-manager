@@ -31,7 +31,7 @@ nav{background:var(--s);border-bottom:1px solid var(--bd);display:flex;overflow-
 nav button{background:none;border:none;color:var(--tm);padding:13px 18px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
 nav button:hover{color:var(--t)}
 nav button.active{color:var(--p);border-bottom-color:var(--p)}
-main{max-width:1100px;margin:0 auto;padding:20px 16px}
+main{max-width:1100px;margin:0 auto;padding:20px 16px;padding-top:120px}
 .tab{display:none}.tab.active{display:block}
 .card{background:var(--s);border:1px solid var(--bd);border-radius:var(--rad);padding:18px;margin-bottom:14px}
 .ctitle{font-size:12px;font-weight:700;margin-bottom:14px;color:var(--tm);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -186,8 +186,8 @@ tr:hover td{background:var(--s2)}
 </head>
 <body>
 
-<!-- sticky-bar: header + nav scroll together as one unit, always on top -->
-<div id="sticky-bar" style="position:sticky;top:0;z-index:100">
+<!-- fixed-bar: header + nav fixed at top, main gets padding-top via JS -->
+<div id="sticky-bar" style="position:fixed;top:0;left:0;right:0;z-index:500">
 <header>
   <div class="logo">
     <div class="logo-icon">🍜</div>
@@ -1276,7 +1276,12 @@ function mondayOf(str) {
   d.setDate(d.getDate() + diff);
   return d;
 }
-function ymd(d) { return d.toISOString().split('T')[0]; }
+function ymd(d) {
+  // Use LOCAL date parts (not UTC) — toISOString() is UTC and causes off-by-one in AU (UTC+10)
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
 function weekData() {
   if (!S.weeks[S.weekKey]) S.weeks[S.weekKey] = { rev:[0,0,0,0,0,0,0], del:[0,0,0,0,0,0,0], lab:{}, food:0, waste:0, lunch:[0,0,0,0,0,0,0], dinner:[0,0,0,0,0,0,0] };
   const w = S.weeks[S.weekKey];
@@ -1298,9 +1303,8 @@ function setWeek(str) {
 }
 function refreshWeekUI() {
   if (!S.weekKey) return;
-  // Always normalize to Monday so the header always shows Mon – Sun regardless of stored key
+  // Use mondayOf for display only — do NOT mutate S.weekKey here
   const mon = mondayOf(S.weekKey);
-  S.weekKey = ymd(mon); // keep S.weekKey canonical
   const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
   const f = d => d.toLocaleDateString('en-AU', {day:'numeric', month:'short'});
   const lbl = f(mon).toUpperCase() + ' – ' + f(sun).toUpperCase();
@@ -5138,6 +5142,17 @@ function init() {
   // WOW features init
   setupPWA();
   updateBackupStatus();
+
+  // ── Fixed bar: auto-measure height and set main padding-top ──
+  (function() {
+    function adjustMainPadding() {
+      const bar = document.getElementById('sticky-bar');
+      const main = document.querySelector('main');
+      if (bar && main) main.style.paddingTop = (bar.offsetHeight + 8) + 'px';
+    }
+    adjustMainPadding();
+    window.addEventListener('resize', adjustMainPadding);
+  })();
 
   // ── Navigation ──
   ['dashboard','labour','roster','food','menu','inventory','breakeven','finance','setup'].forEach(name => {
