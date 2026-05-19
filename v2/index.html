@@ -4038,11 +4038,18 @@ function saveRoster() {
 function copyRosterToActual() {
   if (!S.plans || !S.plans[rosterKey]) return toast('No roster to copy');
   if (!confirm('Copy planned shifts to Actual Labour for week of '+rosterKey+'?')) return;
-  if (!S.weeks[rosterKey]) S.weeks[rosterKey] = { rev:[0,0,0,0,0,0,0], del:[0,0,0,0,0,0,0], lab:{}, food:0, waste:0 };
-  S.weeks[rosterKey].lab = JSON.parse(JSON.stringify(S.plans[rosterKey].lab||{}));
+  // Recalc all staff lab hours from shifts so we always get fresh data
+  const rp = getRosterPlan();
+  (S.staff||[]).forEach(st => { if (st.type !== 'director') recalcLabFromShifts(st.id); });
+  if (!S.weeks[rosterKey]) S.weeks[rosterKey] = { rev:[0,0,0,0,0,0,0], del:[0,0,0,0,0,0,0], lab:{}, food:0, waste:0, lunch:[0,0,0,0,0,0,0], dinner:[0,0,0,0,0,0,0] };
+  S.weeks[rosterKey].lab = JSON.parse(JSON.stringify(rp.lab||{}));
+  // Switch Labour tab to show the same week
+  S.weekKey = rosterKey;
+  sv('weekStart', rosterKey);
   persist();
-  if (rosterKey === S.weekKey) { renderLabTables(); updateAll(); }
-  toast('Copied to actual labour ✓');
+  renderLabTables();
+  updateAll();
+  toast('Copied to Actual Labour ✓ — switched Labour tab to this week');
 }
 
 // ─────────────────────────────────────────────
