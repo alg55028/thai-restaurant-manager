@@ -1318,7 +1318,9 @@ function startFbListener() {
         const localHasData  = S.weeks  && Object.keys(S.weeks ||{}).length > 0;
         // Lần đầu: ưu tiên Firebase nếu có data và không cũ hơn local
         if (remoteHasData && (!localHasData || (remote._ts||0) >= (S._ts||0))) {
+          const keepWeekKey = S.weekKey; // weekKey is UI state — don't let Firebase overwrite it
           S = Object.assign({}, S, remote);
+          S.weekKey = keepWeekKey;
           if (!S.foodPurchases) S.foodPurchases = [];
           try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
           refreshWeekUI(); // refreshWeekUI calls updateAll() internally — no double render
@@ -1340,7 +1342,9 @@ function startFbListener() {
     if (remoteTs < localTs) { setSyncStatus('synced'); return; }
 
     // Remote mới hơn → apply (thiết bị khác vừa save)
+    const keepWeekKey2 = S.weekKey; // weekKey is UI state — preserve local value
     S = Object.assign({}, S, remote);
+    S.weekKey = keepWeekKey2;
     if (!S.foodPurchases) S.foodPurchases = [];
     try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
     // Chỉ update tab đang mở
@@ -1520,10 +1524,12 @@ function setWeek(str) {
 }
 function refreshWeekUI() {
   if (!S.weekKey) return;
-  const mon = new Date(S.weekKey + 'T00:00:00');
+  // Always normalize to Monday so the header always shows Mon – Sun regardless of stored key
+  const mon = mondayOf(S.weekKey);
+  S.weekKey = ymd(mon); // keep S.weekKey canonical
   const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
   const f = d => d.toLocaleDateString('en-AU', {day:'numeric', month:'short'});
-  const lbl = f(mon) + ' – ' + f(sun);
+  const lbl = f(mon).toUpperCase() + ' – ' + f(sun).toUpperCase();
   T('wk-range', lbl);
   T('rev-wk-lbl', lbl);
   renderRevRows();
