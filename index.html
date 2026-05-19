@@ -3,17 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Auto force-reload when a new version is deployed (works for iOS PWA Home Screen apps too) -->
-<script>
-(function(){
-  var V='20260514-2';
-  if(localStorage.getItem('_trm_ver')!==V){
-    localStorage.setItem('_trm_ver',V);
-    var url=location.pathname+'?r='+V;
-    if(location.search!=='?r='+V) location.replace(url);
-  }
-})();
-</script>
+<!-- Cache busting handled by Netlify headers (netlify.toml) — no JS redirect needed -->
 <meta name="theme-color" content="#E85D26">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1432,11 +1422,32 @@ function syncNowToFirebase() {
 }
 
 function persist() {
-  try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
+  try {
+    const json = JSON.stringify(S);
+    localStorage.setItem('trm2', json);
+    // Verify it was actually saved (catches quota exceeded + privacy blocks)
+    const check = localStorage.getItem('trm2');
+    if (!check || check.length < json.length - 10) {
+      console.error('[TRM] persist verification failed — data may not be saved');
+      toast('⚠️ Data save failed! Check browser storage settings.', 5000);
+    }
+  } catch(e) {
+    console.error('[TRM] persist error:', e);
+    toast('⚠️ Cannot save data: ' + (e.name || e.message) + '. Your browser may be blocking storage.', 6000);
+  }
   syncNowToFirebase();
 }
 function hydrate() {
-  try { const d = localStorage.getItem('trm2'); if(d) S = Object.assign({}, S, JSON.parse(d)); } catch(e){}
+  try {
+    const d = localStorage.getItem('trm2');
+    if (d) {
+      const parsed = JSON.parse(d);
+      S = Object.assign({}, S, parsed);
+    }
+  } catch(e) {
+    console.error('[TRM] hydrate error (data may be corrupted):', e);
+    // Don't overwrite S with defaults — keep whatever partial data we have
+  }
   if (!S.foodPurchases) S.foodPurchases = [];
   migrateWeekKeysToMonday();
   migrateFoodCatData();
@@ -3143,7 +3154,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open')}
 function colorClass(v,tgt){return v>tgt+5?'r':v>tgt?'y':'g'}
 function statColor(id,v,tgt){const e=document.getElementById(id);if(e)e.className='stat '+colorClass(v,tgt)}
 function bar(id,v,tgt){const e=document.getElementById(id);if(!e)return;e.style.width=Math.min(v/(tgt*1.5)*100,100)+'%';e.className='pfill '+(v>tgt+5?'fr2':v>tgt?'fy2':'fg2')}
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function toast(msg,dur){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur||2500)}
 
 // ─────────────────────────────────────────────
 //  8-WEEK TREND
