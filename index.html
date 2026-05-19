@@ -1438,7 +1438,43 @@ function persist() {
 function hydrate() {
   try { const d = localStorage.getItem('trm2'); if(d) S = Object.assign({}, S, JSON.parse(d)); } catch(e){}
   if (!S.foodPurchases) S.foodPurchases = [];
+  migrateWeekKeysToMonday();
   migrateFoodCatData();
+}
+
+// One-time migration: normalize all week/plan keys to Monday (Mon–Sun consistency)
+function migrateWeekKeysToMonday() {
+  let changed = false;
+  // Migrate S.weeks
+  Object.keys(S.weeks || {}).forEach(key => {
+    const dow = new Date(key + 'T00:00:00').getDay();
+    if (dow === 1) return; // already Monday
+    const monKey = ymd(mondayOf(key));
+    if (monKey === key) return;
+    if (!S.weeks[monKey]) {
+      S.weeks[monKey] = S.weeks[key];
+    } else {
+      const src = S.weeks[key], dst = S.weeks[monKey];
+      ['rev','del','lunch','dinner'].forEach(arr => {
+        if (src[arr]) dst[arr] = (dst[arr]||[0,0,0,0,0,0,0]).map((v,i) => v || (src[arr][i]||0));
+      });
+      ['food','waste'].forEach(f => { if (!dst[f] && src[f]) dst[f] = src[f]; });
+      Object.keys(src.lab||{}).forEach(sid => { if (!dst.lab) dst.lab={}; if (!dst.lab[sid]) dst.lab[sid]=src.lab[sid]; });
+    }
+    delete S.weeks[key];
+    changed = true;
+  });
+  // Migrate S.plans
+  Object.keys(S.plans || {}).forEach(key => {
+    const dow = new Date(key + 'T00:00:00').getDay();
+    if (dow === 1) return;
+    const monKey = ymd(mondayOf(key));
+    if (monKey === key) return;
+    if (!S.plans[monKey]) S.plans[monKey] = S.plans[key];
+    delete S.plans[key];
+    changed = true;
+  });
+  if (changed) try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
 }
 
 // ─────────────────────────────────────────────
@@ -5310,12 +5346,9 @@ function init() {
     document.getElementById('nav-'+name).addEventListener('click', () => showTab(name));
   });
 
-  // ── Roster: init to next Monday ──
+  // ── Roster: init to current Monday (Mon–Sun format) ──
   (function() {
-    const d = new Date(); const dow = d.getDay();
-    const toNextMon = dow === 0 ? 1 : 8 - dow;
-    d.setDate(d.getDate() + toNextMon);
-    rosterKey = ymd(d);
+    rosterKey = ymd(mondayOf()); // always current week's Monday
     if (!S.plans) S.plans = {};
     if (!S.plans[rosterKey]) S.plans[rosterKey] = { lab:{}, targetRev:0 };
     sv('roster-week', rosterKey);
