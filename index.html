@@ -3473,22 +3473,37 @@ function savePresets() {
 //  COPY LAST WEEK'S ROSTER
 // ─────────────────────────────────────────────
 function copyLastWeekRoster() {
-  const mon = new Date(rosterKey + 'T00:00:00');
-  const lastMon = new Date(mon); lastMon.setDate(lastMon.getDate() - 7);
-  const lastKey = ymd(lastMon);
-  const lastPlan = S.plans && S.plans[lastKey];
-  if (!lastPlan || (!Object.keys(lastPlan.shifts||{}).length && !Object.keys(lastPlan.lab||{}).length)) {
-    return toast('No roster found for ' + lastKey + ' — plan that week first');
+  const fd = d => new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  const hasData = p => p && (Object.keys(p.shifts||{}).length || Object.keys(p.lab||{}).length);
+
+  // Try exact -7 days first, then fall back to most recent plan with data
+  const exactKey = ymd(new Date(new Date(rosterKey+'T00:00:00').setDate(new Date(rosterKey+'T00:00:00').getDate()-7)));
+  let sourceKey = null;
+
+  if (hasData(S.plans && S.plans[exactKey])) {
+    sourceKey = exactKey;
+  } else {
+    // Find most recent plan before current rosterKey that has shift/lab data
+    const candidates = Object.keys(S.plans || {})
+      .filter(k => k < rosterKey && hasData(S.plans[k]))
+      .sort().reverse();
+    sourceKey = candidates[0] || null;
   }
-  const fd = d => d.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-  const sun = new Date(lastMon); sun.setDate(sun.getDate()+6);
-  if (!confirm('Copy roster from '+fd(lastMon)+'–'+fd(sun)+' to this week?\n\nExisting shifts this week will be replaced.')) return;
+
+  if (!sourceKey) return toast('Chưa có roster nào để copy — lên lịch 1 tuần trước rồi thử lại');
+
+  const sourcePlan = S.plans[sourceKey];
+  const srcStart = fd(sourceKey);
+  const srcEnd   = fd(ymd(new Date(new Date(sourceKey+'T00:00:00').setDate(new Date(sourceKey+'T00:00:00').getDate()+6))));
+
+  if (!confirm(`Copy roster từ ${srcStart}–${srcEnd} sang tuần này?\n\nCác ca hiện tại của tuần này sẽ bị thay thế.`)) return;
+
   const rp = getRosterPlan();
-  rp.shifts = JSON.parse(JSON.stringify(lastPlan.shifts || {}));
-  rp.lab    = JSON.parse(JSON.stringify(lastPlan.lab    || {}));
+  rp.shifts = JSON.parse(JSON.stringify(sourcePlan.shifts || {}));
+  rp.lab    = JSON.parse(JSON.stringify(sourcePlan.lab    || {}));
   persist();
   renderRosterTab();
-  toast('Roster copied from ' + lastKey + ' ✓');
+  toast('✅ Roster copied từ ' + srcStart + ' ✓');
 }
 
 // ─────────────────────────────────────────────
