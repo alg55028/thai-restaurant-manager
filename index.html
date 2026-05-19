@@ -2972,8 +2972,8 @@ function renderTrend() {
     const mon = new Date(key+'T00:00:00');
     const sun = new Date(mon); sun.setDate(sun.getDate()+6);
     const f = d => d.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-    return `<tr${isNow?' style="background:rgba(232,93,38,.08)"':''}>
-      <td style="white-space:nowrap;font-size:12px">${f(mon)}–${f(sun)}${isNow?' <span class="badge bo" style="font-size:9px;padding:1px 5px">Now</span>':''}</td>
+    return `<tr data-trend-week="${key}" style="cursor:pointer;${isNow?'background:rgba(232,93,38,.08)':''}" title="Click to view this week's data">
+      <td style="white-space:nowrap;font-size:12px">${f(mon)}–${f(sun)}${isNow?' <span class="badge bo" style="font-size:9px;padding:1px 5px">Now</span>':' <span style="font-size:10px;color:var(--tm)">👁 view</span>'}</td>
       <td class="mono">${net>0?fmt(net):'—'}</td>
       <td class="mono ${net>0?(labPct>lcTgt+3?'tr':labPct>lcTgt?'':'tg'):''}}">${net>0?labPct.toFixed(1)+'%':'—'}</td>
       <td class="mono ${net>0?(foodPct>fcTgt+3?'tr':foodPct>fcTgt?'':'tg'):''}}">${net>0?foodPct.toFixed(1)+'%':'—'}</td>
@@ -2981,6 +2981,22 @@ function renderTrend() {
       <td class="mono ${net>0?(profit>=0?'tg':'tr'):''}}">${net>0?(profit>=0?'':'-')+fmt(Math.abs(profit)):'—'}</td>
     </tr>`;
   }).join('');
+
+  // Click row → jump to that week's data on Dashboard
+  tb.querySelectorAll('tr[data-trend-week]').forEach(tr => {
+    tr.addEventListener('click', function() {
+      const wk = this.dataset.trendWeek;
+      setWeek(wk);
+      sv('weekStart', S.weekKey);
+      showTab('dashboard');
+      window.scrollTo({top:0, behavior:'smooth'});
+      toast('Viewing week of ' + wk + ' ✓');
+    });
+    tr.addEventListener('mouseenter', function() { this.style.background = 'rgba(232,93,38,.12)'; });
+    tr.addEventListener('mouseleave', function() {
+      this.style.background = this.dataset.trendWeek === S.weekKey ? 'rgba(232,93,38,.08)' : '';
+    });
+  });
 }
 
 // ─────────────────────────────────────────────
