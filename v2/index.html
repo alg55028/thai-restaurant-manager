@@ -15,7 +15,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- Firebase SDK loaded on-demand when user clicks Connect -->
+<!-- localStorage-only persistence — no cloud sync -->
 <style>
 :root{--p:#E85D26;--pd:#c44d1e;--bg:#0f1117;--s:#1a1d27;--s2:#22263a;--bd:#2e3347;--t:#e8eaf0;--tm:#7c82a0;--g:#22c55e;--r:#ef4444;--y:#f59e0b;--b:#3b82f6;--rad:10px}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -197,7 +197,7 @@ tr:hover td{background:var(--s2)}
     </div>
   </div>
   <div class="wk">
-    <span id="sync-status" style="font-size:11px;color:var(--tm);padding:4px 8px;border-radius:20px;background:var(--s2);cursor:pointer" title="Click to go to Sync Settings" onclick="showTab('setup');document.getElementById('firebase-card').scrollIntoView({behavior:'smooth'})">⚪ Local</span>
+
     <span class="wk-lbl">Week of</span>
     <input type="date" id="weekStart" style="background:var(--s2);border:1px solid var(--bd);color:var(--t);border-radius:6px;padding:6px 10px;font-size:13px">
     <span class="wk-lbl" id="wk-range"></span>
@@ -777,36 +777,6 @@ tr:hover td{background:var(--s2)}
     </div>
   </div>
 
-  <!-- FIREBASE SYNC -->
-  <div class="card" id="firebase-card">
-    <div class="ctitle">☁️ Cloud Sync — Firebase <span id="fb-badge" class="badge bo" style="margin-left:auto">Not connected</span></div>
-    <div class="alert alb" style="margin-bottom:14px">
-      <span class="al-icon">🔐</span>
-      <div style="font-size:12px">Paste your Firebase config để sync data real-time giữa các thiết bị. Config được lưu <strong>chỉ trên máy này</strong> — không ai khác thấy được.</div>
-    </div>
-    <div class="fg" style="margin-bottom:12px">
-      <label>Firebase Config JSON <span class="tmuted" style="font-weight:400">(từ Firebase Console → Project Settings → Your apps)</span></label>
-      <textarea id="fb-config-input" rows="6" placeholder='{
-  "apiKey": "...",
-  "authDomain": "...",
-  "databaseURL": "...",
-  "projectId": "...",
-  "storageBucket": "...",
-  "messagingSenderId": "...",
-  "appId": "..."
-}' style="background:var(--s2);border:1px solid var(--bd);color:var(--t);border-radius:6px;padding:10px;font-size:12px;font-family:monospace;width:100%;resize:vertical"></textarea>
-    </div>
-    <div class="fg" style="margin-bottom:14px;max-width:320px">
-      <label>Sync Key <span class="tmuted" style="font-weight:400">(mật khẩu bảo vệ data — tất cả thiết bị phải dùng cùng key)</span></label>
-      <input type="password" id="fb-sync-key" placeholder="Nhập ít nhất 6 ký tự" minlength="6">
-    </div>
-    <div class="bgrp">
-      <button class="btn btn-p" id="btn-fb-connect">🔗 Connect & Sync</button>
-      <button class="btn btn-d" id="btn-fb-disconnect" style="display:none">✕ Disconnect</button>
-    </div>
-    <div id="fb-status-msg" style="margin-top:10px;font-size:12px;color:var(--tm)"></div>
-  </div>
-
   <!-- TELEGRAM WEEKLY REPORT -->
   <div class="card" id="telegram-card">
     <div class="ctitle">📲 Telegram Weekly Report <span id="tg-badge" class="badge bo" style="margin-left:auto">Not configured</span></div>
@@ -1225,205 +1195,10 @@ let S = {
 };
 
 // ─────────────────────────────────────────────
-//  FIREBASE SYNC
+//  PERSISTENCE — localStorage only
 // ─────────────────────────────────────────────
-let _fbApp = null;
-let _fbDb  = null;
-let _fbRef = null;
-let _fbSyncTimeout = null;
-let _fbListening = false;
-let _fbIgnoreNext = false; // prevent echo loop
-
-function setSyncStatus(st) {
-  const el  = document.getElementById('sync-status');
-  const bdg = document.getElementById('fb-badge');
-  const map = {
-    local:    { text:'⚪ Local',     color:'var(--tm)', bg:'var(--s2)', badge:'Not connected', bcls:'bo'   },
-    syncing:  { text:'🔄 Syncing…',  color:'var(--y)',  bg:'rgba(245,158,11,.12)', badge:'Syncing…', bcls:'by' },
-    synced:   { text:'🟢 Synced',    color:'var(--g)',  bg:'rgba(34,197,94,.12)',  badge:'Connected ✓', bcls:'bg' },
-    offline:  { text:'🔴 Offline',   color:'var(--r)',  bg:'rgba(239,68,68,.12)',  badge:'Offline',  bcls:'br' },
-    error:    { text:'⚠️ Sync error',color:'var(--r)',  bg:'rgba(239,68,68,.12)',  badge:'Error',    bcls:'br' },
-  };
-  const m = map[st] || map.local;
-  if (el)  { el.textContent = m.text; el.style.color = m.color; el.style.background = m.bg; }
-  if (bdg) { bdg.textContent = m.badge; bdg.className = 'badge ' + m.bcls; }
-}
-
-function fbKey(syncKey) {
-  // simple deterministic path from sync key (no crypto needed — config is already private)
-  let h = 0;
-  for (let i = 0; i < syncKey.length; i++) h = (Math.imul(31, h) + syncKey.charCodeAt(i)) | 0;
-  return 'r' + Math.abs(h).toString(36);
-}
-
-function loadFirebaseSDK() {
-  return new Promise((resolve, reject) => {
-    if (window.firebase && window.firebase.database) { resolve(); return; }
-    setFbMsg('⏳ Đang tải Firebase SDK…');
-    const s1 = document.createElement('script');
-    s1.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
-    s1.onload = () => {
-      const s2 = document.createElement('script');
-      s2.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js';
-      s2.onload = resolve;
-      s2.onerror = () => reject(new Error('Không load được Firebase Database SDK'));
-      document.head.appendChild(s2);
-    };
-    s1.onerror = () => reject(new Error('Không load được Firebase SDK'));
-    document.head.appendChild(s1);
-  });
-}
-
-function connectFirebase(configStr, syncKey) {
-  let cfg;
-  try {
-    cfg = typeof configStr === 'string' ? JSON.parse(configStr) : configStr;
-  } catch(e) { setFbMsg('❌ Config JSON không hợp lệ'); return; }
-  if (!cfg.apiKey || !cfg.databaseURL) {
-    setFbMsg('❌ Config thiếu apiKey hoặc databaseURL'); return;
-  }
-  if (!syncKey || syncKey.length < 6) {
-    setFbMsg('❌ Sync Key phải ít nhất 6 ký tự'); return;
-  }
-  setSyncStatus('syncing');
-  // Load SDK on-demand → then connect
-  loadFirebaseSDK().then(() => {
-    if (_fbApp) { try { _fbApp.delete(); } catch(e){} }
-    _fbApp = firebase.initializeApp(cfg, 'trm-' + Date.now());
-    _fbDb  = firebase.database(_fbApp);
-    _fbRef = _fbDb.ref('trm2/' + fbKey(syncKey));
-    localStorage.setItem('trm2_fb_cfg', JSON.stringify({ config: cfg, syncKey }));
-    startFbListener();
-    updateFbUI(true);
-    setFbMsg('✅ Đang kết nối…');
-  }).catch(e => {
-    setFbMsg('❌ ' + e.message);
-    setSyncStatus('error');
-  });
-}
-
-function startFbListener() {
-  if (_fbListening || !_fbRef) return;
-  _fbListening = true;
-  let _firstLoad = true; // skip re-render on initial load
-
-  _fbRef.on('value', snap => {
-    if (_fbIgnoreNext) { _fbIgnoreNext = false; setSyncStatus('synced'); return; }
-    const remote = snap.val();
-
-    if (_firstLoad) {
-      _firstLoad = false;
-      if (remote && typeof remote === 'object') {
-        const remoteHasData = remote.weeks && Object.keys(remote.weeks||{}).length > 0;
-        const localHasData  = S.weeks  && Object.keys(S.weeks ||{}).length > 0;
-        // Lần đầu: ưu tiên Firebase nếu có data và không cũ hơn local
-        if (remoteHasData && (!localHasData || (remote._ts||0) >= (S._ts||0))) {
-          const keepWeekKey = S.weekKey; // weekKey is UI state — don't let Firebase overwrite it
-          S = Object.assign({}, S, remote);
-          S.weekKey = keepWeekKey;
-          if (!S.foodPurchases) S.foodPurchases = [];
-          try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
-          refreshWeekUI(); // refreshWeekUI calls updateAll() internally — no double render
-        } else if (localHasData && !remoteHasData) {
-          syncNowToFirebase(); // local có data, Firebase trống → push lên
-        }
-      } else {
-        syncNowToFirebase(); // Firebase trống → push local lên
-      }
-      setSyncStatus('synced');
-      setFbMsg('✅ Connected — data synced across devices');
-      return;
-    }
-
-    // Các lần sau: bỏ qua chỉ khi remote CŨ HƠN local
-    if (!remote || typeof remote !== 'object') return;
-    const remoteTs = remote._ts || 0;
-    const localTs  = S._ts  || 0;
-    if (remoteTs < localTs) { setSyncStatus('synced'); return; }
-
-    // Remote mới hơn → apply (thiết bị khác vừa save)
-    const keepWeekKey2 = S.weekKey; // weekKey is UI state — preserve local value
-    S = Object.assign({}, S, remote);
-    S.weekKey = keepWeekKey2;
-    if (!S.foodPurchases) S.foodPurchases = [];
-    try { localStorage.setItem('trm2', JSON.stringify(S)); } catch(e){}
-    // Chỉ update tab đang mở
-    const activeTab = document.querySelector('.tab.active')?.id;
-    if      (activeTab === 'tab-finance')   renderFinanceTab();
-    else if (activeTab === 'tab-food')      { loadFoodSpend(); updateAll(); }
-    else if (activeTab === 'tab-labour')    renderLabTables();
-    else if (activeTab === 'tab-inventory') renderInventoryTab();
-    else updateAll();
-
-    setSyncStatus('synced');
-    setFbMsg('✅ Connected — data synced across devices');
-  }, err => {
-    setSyncStatus('error');
-    setFbMsg('❌ ' + err.message);
-  });
-
-  // Connection state indicator only
-  _fbDb.ref('.info/connected').on('value', snap => {
-    if (!snap.val()) setSyncStatus('offline');
-  });
-}
-
-function disconnectFirebase() {
-  if (_fbRef)  { try { _fbRef.off(); } catch(e){} }
-  if (_fbApp)  { try { _fbApp.delete(); } catch(e){} }
-  _fbApp = null; _fbDb = null; _fbRef = null; _fbListening = false;
-  localStorage.removeItem('trm2_fb_cfg');
-  updateFbUI(false);
-  setSyncStatus('local');
-  setFbMsg('');
-  toast('Cloud sync disconnected');
-}
-
-function updateFbUI(connected) {
-  const disc = document.getElementById('btn-fb-disconnect');
-  const conn = document.getElementById('btn-fb-connect');
-  if (disc) disc.style.display = connected ? '' : 'none';
-  if (conn) conn.style.display = connected ? 'none' : '';
-}
-
-function setFbMsg(msg) {
-  const el = document.getElementById('fb-status-msg');
-  if (el) el.textContent = msg;
-}
-
-function loadSavedFbConfig() {
-  try {
-    const saved = localStorage.getItem('trm2_fb_cfg');
-    if (!saved) return;
-    const { config, syncKey } = JSON.parse(saved);
-    // Fill form fields
-    const ta = document.getElementById('fb-config-input');
-    if (ta) ta.value = JSON.stringify(config, null, 2);
-    const ki = document.getElementById('fb-sync-key');
-    if (ki) ki.value = syncKey;
-    // Safe auto-reconnect: delay 2s so page is fully interactive first,
-    // THEN reconnect Firebase in the background (no UI freeze)
-    setSyncStatus('syncing');
-    setFbMsg('⏳ Đang kết nối lại Firebase (2s)…');
-    setTimeout(() => {
-      // Only reconnect if not already connected (user might have clicked manually)
-      if (!_fbRef) connectFirebase(JSON.stringify(config), syncKey);
-    }, 2000);
-  } catch(e) {}
-}
-
-function syncNowToFirebase() {
-  if (!_fbRef) return;
-  clearTimeout(_fbSyncTimeout);
-  _fbSyncTimeout = setTimeout(() => {
-    S._ts = Date.now(); // timestamp mỗi lần ghi
-    setSyncStatus('syncing');
-    _fbIgnoreNext = true;
-    _fbRef.set(S)
-      .then(() => setSyncStatus('synced'))
-      .catch(() => { setSyncStatus('error'); _fbIgnoreNext = false; });
-  }, 1200);
-}
+// Clean up any leftover Firebase config from previous versions
+try { localStorage.removeItem('trm2_fb_cfg'); } catch(e){}
 
 function persist() {
   try {
@@ -1439,7 +1214,6 @@ function persist() {
     console.error('[TRM] persist error:', e);
     toast('⚠️ Cannot save data: ' + (e.name || e.message) + '. Your browser may be blocking storage.', 6000);
   }
-  syncNowToFirebase();
 }
 function hydrate() {
   try {
@@ -5469,16 +5243,6 @@ function init() {
 
   // ── Setup save button ──
   document.getElementById('btn-save-setup').addEventListener('click', saveSetup);
-  // ── Firebase Sync ──
-  document.getElementById('btn-fb-connect').addEventListener('click', function() {
-    const cfg = document.getElementById('fb-config-input').value.trim();
-    const key = document.getElementById('fb-sync-key').value.trim();
-    if (!cfg) { setFbMsg('❌ Paste Firebase config JSON trước'); return; }
-    connectFirebase(cfg, key);
-  });
-  document.getElementById('btn-fb-disconnect').addEventListener('click', disconnectFirebase);
-  // Auto-reconnect: chỉ load config vào form, KHÔNG tự connect
-  loadSavedFbConfig();
 
   // ── GST toggle: live update dashboard without requiring Save ──
   document.getElementById('s-gst').addEventListener('change', function() {
