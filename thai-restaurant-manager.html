@@ -265,7 +265,7 @@ tr:hover td{background:var(--s2)}
     <div id="gst-summary" style="display:none;margin-top:14px;border:1px solid rgba(59,130,246,.35);border-radius:8px;background:rgba(59,130,246,.06);padding:14px">
       <div style="font-size:11px;font-weight:700;color:var(--b);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏛️ GST Summary — Weekly (ATO)</div>
       <div class="pl-row"><div><div style="font-size:13px">GST Collected (on sales)</div><div class="tmuted" style="font-size:12px">1/11 of gross revenue incl. GST</div></div><div class="pl-amt" style="color:var(--b)" id="gst-collected">$0.00</div></div>
-      <div class="pl-row"><div><div style="font-size:13px">Input Tax Credits (purchases)</div><div class="tmuted" style="font-size:12px">GST on food spend + fixed overheads</div></div><div class="pl-amt tr" id="gst-credits">-$0.00</div></div>
+      <div class="pl-row"><div><div style="font-size:13px">Input Tax Credits (purchases)</div><div class="tmuted" style="font-size:12px">Fixed overheads (inc. GST) + GST-taxable food purchases</div></div><div class="pl-amt tr" id="gst-credits">-$0.00</div></div>
       <div style="background:var(--s2);border-radius:6px;padding:11px 13px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-size:14px;font-weight:600">Net GST Payable to ATO</div>
@@ -726,9 +726,14 @@ tr:hover td{background:var(--s2)}
         <span style="font-size:14px;font-weight:600">Enable GST Tracking</span>
       </label>
     </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Food purchases with GST (%) <span class="tmuted" style="font-size:11px;font-weight:400">— e.g. enter 10 if ~90% of your ingredients are GST-free (fresh produce, raw meat)</span></label>
+      <input type="number" id="s-food-gst-pct" placeholder="10" min="0" max="100" step="1" style="width:120px">
+    </div>
     <div class="alert alb"><span class="al-icon">📋</span><div style="font-size:12px">
       <strong>How it works:</strong> All restaurant sales include 10% GST. GST component = price ÷ 11.<br>
-      <strong>Input Tax Credits:</strong> You can claim back GST paid on food purchases + fixed overheads.<br>
+      <strong>Input Tax Credits:</strong> Fixed overheads (inc. GST) + only the GST-taxable portion of food spend.<br>
+      <strong>Note:</strong> Fresh produce, raw meat &amp; most ingredients are GST-free — adjust % above accordingly.<br>
       <strong>Net GST Payable</strong> = GST Collected − Input Tax Credits → lodged quarterly via BAS.
     </div></div>
   </div>
@@ -1181,7 +1186,7 @@ const FOOD_CATS = [
 ];
 
 let S = {
-  setup: { name:'My Thai Restaurant', fc:30, lc:32, rent:0, util:0, ins:0, admin:0, mkt:0, other:0, gstEnabled:true },
+  setup: { name:'My Thai Restaurant', fc:30, lc:32, rent:0, util:0, ins:0, admin:0, mkt:0, other:0, gstEnabled:true, foodGstPct:10 },
   staff: [],
   ingredients: [],
   recipes: [],
@@ -1487,10 +1492,11 @@ function renderWeeklyPL() {
   const pColor     = profit>=0?'var(--g)':'var(--r)';
   const margin     = revenue>0?(profit/revenue*100):0;
   // GST for weekly finance P&L
-  const wplGstEnabled = S.setup.gstEnabled !== false;
+  const wplGstEnabled  = S.setup.gstEnabled !== false;
+  const wplFoodGstFrac = (S.setup.foodGstPct !== undefined ? S.setup.foodGstPct : 10) / 100;
   let wplNetGST = 0;
   if (wplGstEnabled && grossRev > 0) {
-    wplNetGST = grossRev / 11 - (foodSpend + fixed) / 11;
+    wplNetGST = grossRev / 11 - (fixed / 11 + (foodSpend * wplFoodGstFrac) / 11);
   }
   const trueWeekProfit   = wplGstEnabled && grossRev > 0 ? profit - Math.max(wplNetGST, 0) : profit;
   const trueProfitColor  = trueWeekProfit >= 0 ? 'var(--g)' : 'var(--r)';
@@ -1512,18 +1518,31 @@ function renderWeeklyPL() {
       </div>
     </div>
     <div style="background:var(--s2);border-radius:10px;padding:16px;border:2px solid ${pColor}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-        <div>
-          <div style="font-size:12px;color:var(--tm);text-transform:uppercase;letter-spacing:.5px">Weekly P&L</div>
-          <div style="font-size:11px;color:var(--tm);margin-top:2px">${revenue===0?'No revenue entered yet':'Revenue − All Costs'}</div>
+      ${wplGstEnabled && grossRev > 0 ? `
+      <div style="display:flex;flex-direction:column;gap:0;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
+          <span style="font-size:13px;color:var(--tm)">Net Profit <span style="font-size:11px">(before GST)</span></span>
+          <span style="font-size:15px;font-weight:700;font-family:monospace;color:${pColor}">${profit>=0?'+':'−'}$${fmtC(Math.abs(profit))}</span>
         </div>
-        ${wplGstEnabled && grossRev > 0 ? `
-        <div style="text-align:right;line-height:1.4">
-          <div style="font-size:14px;font-family:monospace;color:${pColor}">${profit>=0?'+':'−'}$${fmtC(Math.abs(profit))} <span style="font-size:10px;color:var(--tm);font-weight:400">before GST</span></div>
-          <div style="font-size:24px;font-weight:800;font-family:monospace;color:${trueProfitColor}">${trueWeekProfit>=0?'+':'−'}$${fmtC(Math.abs(trueWeekProfit))}</div>
-          <div style="font-size:10px;color:var(--tm)">true profit (after ATO)</div>
-        </div>` : `<span style="font-size:26px;font-weight:800;font-family:monospace;color:${pColor}">${profit>=0?'+':''}$${fmtC(Math.abs(profit))}</span>`}
-      </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
+          <span style="font-size:13px;color:var(--tm)">GST Payable to ATO</span>
+          <span style="font-size:15px;font-weight:700;font-family:monospace;color:var(--r)">−$${fmtC(Math.max(wplNetGST,0))}</span>
+        </div>
+        <div style="border-top:2px solid var(--bd);padding-top:10px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:14px;font-weight:700">${trueWeekProfit>=0?'✅ True Profit':'🔴 Net Loss'}</div>
+            <div style="font-size:11px;color:var(--tm);margin-top:2px">Money you actually keep</div>
+          </div>
+          <span style="font-size:24px;font-weight:800;font-family:monospace;color:${trueProfitColor}">${trueWeekProfit>=0?'+':'−'}$${fmtC(Math.abs(trueWeekProfit))}</span>
+        </div>
+      </div>` : `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:12px;color:var(--tm);text-transform:uppercase;letter-spacing:.5px">Net Profit</div>
+          <div style="font-size:11px;color:var(--tm)">${revenue===0?'No revenue entered yet':'Revenue − All Costs'}</div>
+        </div>
+        <span style="font-size:26px;font-weight:800;font-family:monospace;color:${pColor}">${profit>=0?'+':''}$${fmtC(Math.abs(profit))}</span>
+      </div>`}
       <div style="display:flex;align-items:center;gap:8px">
         <div style="flex:1;height:8px;background:var(--bd);border-radius:4px;overflow:hidden">
           <div style="width:${Math.min(Math.abs(margin),100)}%;height:100%;background:${pColor};border-radius:4px;transition:width .4s"></div>
@@ -1802,7 +1821,8 @@ function saveSetup() {
   S.setup.fc         = num('s-fc', 30);
   S.setup.lc         = num('s-lc', 32);
   S.setup.cashFloat  = num('s-cashfloat', 130);
-  S.setup.gstEnabled = document.getElementById('s-gst').checked;
+  S.setup.gstEnabled  = document.getElementById('s-gst').checked;
+  S.setup.foodGstPct  = num('s-food-gst-pct', 10);
   S.setup.rent  = num('c-rent', 0);
   S.setup.util  = num('c-util', 0);
   S.setup.ins   = num('c-ins', 0);
@@ -1821,11 +1841,13 @@ function saveSetup() {
 function loadSetup() {
   const s = S.setup;
   if (s.gstEnabled === undefined) s.gstEnabled = true; // default for existing data
+  if (s.foodGstPct === undefined) s.foodGstPct = 10;  // default: 90% GST-free ingredients
   sv('s-name', s.name);
   sv('s-fc', s.fc);
   sv('s-lc', s.lc);
   const gstEl = document.getElementById('s-gst');
   if (gstEl) gstEl.checked = s.gstEnabled;
+  sv('s-food-gst-pct', s.foodGstPct !== undefined ? s.foodGstPct : 10);
   sv('s-cashfloat', s.cashFloat != null ? s.cashFloat : 130);
   sv('c-rent', s.rent || '');
   sv('c-util', s.util || '');
@@ -1876,6 +1898,28 @@ function deleteStaff(id) {
   renderLabTables();
   updateAll();
 }
+
+function updateStaffRate(id, val) {
+  const s = S.staff.find(x => x.id === id);
+  if (!s) return;
+  const rate = parseFloat(val);
+  s.rate = isNaN(rate) ? 0 : rate;
+  persist();
+  renderStaffTable();
+  renderLabTables();
+  updateAll();
+}
+
+function updateStaffPct(id, val) {
+  const s = S.staff.find(x => x.id === id);
+  if (!s) return;
+  const pct = parseFloat(val);
+  s.ratePct = isNaN(pct) ? 0 : pct;
+  persist();
+  renderStaffTable();
+  renderLabTables();
+  updateAll();
+}
 function renderStaffTable() {
   const tb = document.getElementById('staff-body');
   if (!S.staff.length) { tb.innerHTML = '<tr><td colspan="8" style="color:var(--tm);text-align:center;padding:18px">No staff added yet.</td></tr>'; return; }
@@ -1884,7 +1928,7 @@ function renderStaffTable() {
       return `<tr>
         <td><strong>${esc(s.name)}</strong></td>
         <td><span class="badge by">director</span></td>
-        <td class="mono" colspan="5" style="color:var(--y)">${s.ratePct}% of weekly net revenue + 12% super</td>
+        <td colspan="5" style="color:var(--y)"><input class="tdinput" type="number" min="1" max="50" step="0.5" value="${s.ratePct}" data-pct-staff="${s.id}" style="width:70px">% of weekly net revenue + 12% super</td>
         <td><button class="btn btn-d btn-sm" data-del-staff="${s.id}">✕</button></td>
       </tr>`;
     }
@@ -1892,7 +1936,7 @@ function renderStaffTable() {
     return `<tr>
       <td><strong>${esc(s.name)}</strong></td>
       <td><span class="badge ${s.type==='casual'?'bo':'bb'}">${s.type}</span></td>
-      <td class="mono">$${s.rate.toFixed(2)}</td>
+      <td><input class="tdinput" type="number" min="24.95" step="0.05" value="${s.rate}" data-rate-staff="${s.id}" style="width:80px"></td>
       <td class="mono">$${(s.rate*r[0]).toFixed(2)}</td>
       <td class="mono" style="color:var(--y)">$${(s.rate*r[5]).toFixed(2)}</td>
       <td class="mono" style="color:var(--p)">$${(s.rate*r[6]).toFixed(2)}</td>
@@ -2893,8 +2937,9 @@ function updateAll() {
   if (gstBox) gstBox.style.display = gstEnabled ? 'block' : 'none';
   let netGST = 0;
   if (gstEnabled) {
+    const foodGstFrac   = (S.setup.foodGstPct !== undefined ? S.setup.foodGstPct : 10) / 100;
     const gstCollected  = gross / 11;
-    const inputCredits  = (foodSpend + fixed) / 11;
+    const inputCredits  = fixed / 11 + (foodSpend * foodGstFrac) / 11;
     netGST              = gstCollected - inputCredits;
     const quarterlyEst  = netGST * 13;
     T('gst-collected', fmt(gstCollected));
@@ -2905,20 +2950,37 @@ function updateAll() {
     if (payEl) payEl.style.color = netGST <= 0 ? 'var(--g)' : 'var(--b)';
   }
 
-  // P&L Result — show before-GST AND true profit (after ATO) when GST is on
+  // P&L Result — clean accounting table when GST is on
   const resEl    = document.getElementById('pl-res');
   const resLblEl = document.getElementById('pl-res-lbl');
+  const plTotal  = resLblEl ? resLblEl.parentElement : null;
   if (gstEnabled && gross > 0) {
     const trueProfit = profit - Math.max(netGST, 0);
-    const pColor  = profit     >= 0 ? 'var(--g)' : 'var(--r)';
-    const tColor  = trueProfit >= 0 ? 'var(--g)' : 'var(--r)';
-    resLblEl.innerHTML = `<div style="font-size:15px;font-weight:700">${profit>=0?'✅ Net Profit':'🔴 Net Loss'}</div><div style="font-size:11px;color:var(--tm);margin-top:3px">Before → After ATO</div>`;
-    resEl.innerHTML = `<div style="text-align:right;line-height:1.4">
-      <div style="font-size:13px;font-family:monospace;color:${pColor}">${profit<0?'−':'+'}${fmt(Math.abs(profit))} <span style="font-size:10px;color:var(--tm);font-weight:400">before GST</span></div>
-      <div style="font-size:20px;font-weight:800;font-family:monospace;color:${tColor}">${trueProfit<0?'−':'+'}${fmt(Math.abs(trueProfit))}</div>
-      <div style="font-size:10px;color:var(--tm)">true profit (after ATO)</div>
-    </div>`;
+    const pColor = profit     >= 0 ? 'var(--g)' : 'var(--r)';
+    const tColor = trueProfit >= 0 ? 'var(--g)' : 'var(--r)';
+    if (plTotal) { plTotal.style.flexDirection = 'column'; plTotal.style.alignItems = 'stretch'; }
+    if (resLblEl) resLblEl.style.display = 'none';
+    resEl.className = '';
+    resEl.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0">
+        <span style="font-size:13px;color:var(--tm)">Net Profit <span style="font-size:11px">(before GST)</span></span>
+        <span style="font-size:15px;font-weight:700;font-family:monospace;color:${pColor}">${profit<0?'−':'+'}${fmt(Math.abs(profit))}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0">
+        <span style="font-size:13px;color:var(--tm)">GST Payable to ATO</span>
+        <span style="font-size:15px;font-weight:700;font-family:monospace;color:var(--r)">−${fmt(Math.max(netGST, 0))}</span>
+      </div>
+      <div style="border-top:2px solid var(--bd);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:15px;font-weight:700">${trueProfit>=0?'✅ True Profit':'🔴 Net Loss'}</div>
+          <div style="font-size:11px;color:var(--tm);margin-top:2px">Money you actually keep</div>
+        </div>
+        <span style="font-size:22px;font-weight:800;font-family:monospace;color:${tColor}">${trueProfit<0?'−':'+'}${fmt(Math.abs(trueProfit))}</span>
+      </div>`;
   } else {
+    if (plTotal) { plTotal.style.flexDirection = ''; plTotal.style.alignItems = ''; }
+    if (resLblEl) { resLblEl.style.display = ''; resLblEl.className = 'pl-tlbl'; }
+    resEl.className = 'pl-tamt';
     resEl.innerHTML = '';
     resEl.style.color = profit >= 0 ? 'var(--g)' : 'var(--r)';
     T('pl-res', (profit<0?'-':'')+fmt(Math.abs(profit)));
@@ -4677,7 +4739,8 @@ function printWeeklyReport() {
   const profit=netRev-labTot-food-fixed;
   const labPct=netRev>0?labTot/netRev*100:0, foodPct=netRev>0?food/netRev*100:0;
   const prime=labPct+foodPct;
-  const gstC=gross/11, gstIn=(food+fixed)/11, netGST=gstC-gstIn;
+  const _foodGstFrac=( S.setup.foodGstPct!==undefined?S.setup.foodGstPct:10)/100;
+  const gstC=gross/11, gstIn=fixed/11+(food*_foodGstFrac)/11, netGST=gstC-gstIn;
   const mon=new Date(S.weekKey+'T00:00:00'); const sun=new Date(mon); sun.setDate(sun.getDate()+6);
   const fdt=d=>d.toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
   const fa=n=>'$'+(n||0).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4732,7 +4795,7 @@ function printWeeklyReport() {
 ${s.gstEnabled!==false?`<div class="sec"><div class="sec-title">GST Summary (ATO)</div><div class="gst"><table>
 <thead><tr><th>Item</th><th class="rt">Amount</th><th>Notes</th></tr></thead><tbody>
 <tr><td>GST Collected (1/11 of gross)</td><td class="mono blue">${fa(gstC)}</td><td style="font-size:11px;color:#555">Collected from customers</td></tr>
-<tr><td>Input Tax Credits (1/11 of purchases)</td><td class="mono red">−${fa(gstIn)}</td><td style="font-size:11px;color:#555">Food spend + overheads (wages excluded)</td></tr>
+<tr><td>Input Tax Credits (1/11 of purchases)</td><td class="mono red">−${fa(gstIn)}</td><td style="font-size:11px;color:#555">Fixed overheads + ${(S.setup.foodGstPct||10)}% of food spend (wages excluded)</td></tr>
 <tr style="font-weight:700;border-top:2px solid #bfdbfe"><td>Net GST Payable to ATO</td><td class="mono blue">${fa(Math.max(netGST,0))}</td><td style="font-size:11px;color:#555">Quarterly BAS est: ${fa(Math.max(netGST,0)*13)}</td></tr>
 </tbody></table><div style="font-size:10px;color:#666;margin-top:8px">⚠️ Estimate only — consult your accountant for BAS preparation.</div></div></div>`:''}
 <div class="foot"><span>${esc(s.name)} — Confidential</span><span>Week: ${S.weekKey} | Restaurant Manager v1.0</span></div>
@@ -5328,6 +5391,14 @@ function init() {
   document.getElementById('staff-body').addEventListener('click', function(e) {
     const id = e.target.dataset.delStaff;
     if (id) deleteStaff(parseInt(id));
+  });
+
+  // ── Staff table: edit wage rate / director % via delegation ──
+  document.getElementById('staff-body').addEventListener('change', function(e) {
+    const rateId = e.target.dataset.rateStaff;
+    const pctId = e.target.dataset.pctStaff;
+    if (rateId !== undefined) updateStaffRate(parseInt(rateId), e.target.value);
+    else if (pctId !== undefined) updateStaffPct(parseInt(pctId), e.target.value);
   });
 
   // ── Labour clear ──
