@@ -309,12 +309,12 @@ tr:hover td{background:var(--s2)}
   <div id="lab-alerts"></div>
   <div class="sgrid">
     <div class="stat" id="lab-tot-stat"><div class="slbl">Total Payroll (incl. Super)</div><div class="sval" id="lab-tot-v">$0</div><div class="ssub" id="lab-tot-s">0% of revenue</div></div>
-    <div class="stat"><div class="slbl">Super Component</div><div class="sval" id="lab-sup-v">$0</div><div class="ssub">12% Superannuation</div></div>
+    <div class="stat"><div class="slbl">Super Component</div><div class="sval" id="lab-sup-v">$0</div><div class="ssub" id="lab-sup-s">12% Superannuation</div></div>
     <div class="stat"><div class="slbl">Weekend / PH Premium</div><div class="sval" id="lab-pen-v">$0</div><div class="ssub">Penalty cost above base</div></div>
   </div>
   <div class="card">
-    <div class="ctitle">👥 Weekly Hours &amp; Pay <span class="badge bb" style="margin-left:auto">Restaurant Award MA000119</span></div>
-    <div class="alert alb"><span class="al-icon">ℹ️</span><div>Rates auto-calculated per <strong>Restaurant Industry Award 2020 [MA000119]</strong>. Casual: Mon–Fri 125%, Sat 175%, Sun 200%, PH 275%. Part-time: Mon–Fri 100%, Sat 150%, Sun 175%, PH 250%. Super: +12% on all wages.</div></div>
+    <div class="ctitle">👥 Weekly Hours &amp; Pay <span class="badge bb" style="margin-left:auto">Your own pay rates</span></div>
+    <div class="alert alb"><span class="al-icon">ℹ️</span><div>Rates come from what you entered per staff member in <strong>Setup → Staff Roster</strong> (Mon–Fri $/hr + Weekend $/hr). Public Holiday shown there is a reference estimate only. Super is applied automatically at the % set in Setup.</div></div>
     <div id="lab-tables"></div>
     <div class="bgrp"><button class="btn btn-g btn-sm" id="btn-clear-lab">Clear All Hours</button></div>
   </div>
@@ -327,7 +327,7 @@ tr:hover td{background:var(--s2)}
         <tr><td>Saturday</td><td style="color:var(--y)">150%</td><td style="color:var(--y)">175%</td><td>$37.50</td><td>$43.75</td></tr>
         <tr><td>Sunday</td><td style="color:var(--p)">175%</td><td style="color:var(--p)">200%</td><td>$43.75</td><td>$50.00</td></tr>
         <tr><td>Public Holiday</td><td style="color:var(--r)">250%</td><td style="color:var(--r)">275%</td><td>$62.50</td><td>$68.75</td></tr>
-        <tr><td colspan="5" style="color:var(--tm);font-size:12px">+ 12% Super on all above. Casual rate already includes 25% loading.</td></tr>
+        <tr><td colspan="5" style="color:var(--tm);font-size:12px">Award minimums shown for reference — your own rates are set per staff member in Staff Roster.</td></tr>
       </tbody>
     </table></div>
   </div>
@@ -607,7 +607,7 @@ tr:hover td{background:var(--s2)}
       <div class="fg"><label>Revenue Target for this week ($)</label><input type="number" id="roster-target-rev" placeholder="e.g. 8000" min="0" step="100"></div>
     </div>
     <div class="sgrid">
-      <div class="stat"><div class="slbl">Est. Labour Cost</div><div class="sval" id="r-est-lab">$0</div><div class="ssub">incl. 12% super</div></div>
+      <div class="stat"><div class="slbl">Est. Labour Cost</div><div class="sval" id="r-est-lab">$0</div><div class="ssub" id="r-est-lab-s">incl. 12% super</div></div>
       <div class="stat" id="r-est-pct-card"><div class="slbl">Est. Labour %</div><div class="sval" id="r-est-pct">—</div><div class="ssub" id="r-est-pct-s">Enter target revenue above</div></div>
       <div class="stat"><div class="slbl">Total Planned Hours</div><div class="sval" id="r-est-hrs">0 h</div><div class="ssub">across all staff</div></div>
     </div>
@@ -708,6 +708,7 @@ tr:hover td{background:var(--s2)}
       <div class="fg"><label>Cash Float (daily start $)</label><input type="number" id="s-cashfloat" placeholder="130" min="0" step="5"></div>
       <div class="fg"><label>Food Cost Target (%)</label><input type="number" id="s-fc" value="30" min="10" max="50"></div>
       <div class="fg"><label>Labour Cost Target (%)</label><input type="number" id="s-lc" value="32" min="10" max="55"></div>
+      <div class="fg"><label>Superannuation (%)</label><input type="number" id="s-super" value="12" min="0" max="30" step="0.5"></div>
     </div>
   </div>
 
@@ -761,8 +762,8 @@ tr:hover td{background:var(--s2)}
   <div class="card">
     <div class="sh"><div class="stitle">👥 Staff Roster</div><button class="btn btn-p btn-sm" id="btn-add-staff">+ Add Staff</button></div>
     <div class="twrap"><table>
-      <thead><tr><th>Name</th><th>Type</th><th>Base $/hr</th><th>Mon–Fri rate</th><th>Saturday</th><th>Sunday</th><th>Public Hol.</th><th></th></tr></thead>
-      <tbody id="staff-body"><tr><td colspan="8" style="color:var(--tm);text-align:center;padding:18px">No staff added yet.</td></tr></tbody>
+      <thead><tr><th>Name</th><th>Type</th><th>Mon–Fri $/hr</th><th>Weekend $/hr</th><th>Public Hol.</th><th></th></tr></thead>
+      <tbody id="staff-body"><tr><td colspan="6" style="color:var(--tm);text-align:center;padding:18px">No staff added yet.</td></tr></tbody>
     </table></div>
   </div>
 
@@ -866,10 +867,13 @@ tr:hover td{background:var(--s2)}
         <option value="director">Director / Owner (% of weekly revenue)</option>
       </select>
     </div>
-    <div id="m-s-rate-row" style="margin-bottom:6px"><div class="fg"><label>Base Hourly Rate ($) — their ordinary Mon–Fri rate</label><input type="number" id="m-s-rate" placeholder="e.g. 25.00" min="24.95" step="0.05"></div>
-    <div class="tmuted" style="margin-top:4px;font-size:12px">Min wage July 2025: $24.95/hr. Penalty rates & super applied automatically.</div></div>
+    <div id="m-s-rate-row" style="margin-bottom:6px">
+      <div class="fg" style="margin-bottom:10px"><label>Mon–Fri Rate ($/hr)</label><input type="number" id="m-s-rate" placeholder="e.g. 32.00" min="24.95" step="0.05"></div>
+      <div class="fg"><label>Weekend Rate ($/hr) — applies Sat &amp; Sun</label><input type="number" id="m-s-weekend-rate" placeholder="e.g. 45.00" min="24.95" step="0.05"></div>
+      <div class="tmuted" style="margin-top:4px;font-size:12px">Enter your own rates from your pay table. Min wage July 2025: $24.95/hr. Super applied automatically on top.</div>
+    </div>
     <div id="m-s-pct-row" style="display:none;margin-bottom:6px"><div class="fg"><label>Director Pay — % of weekly net revenue</label><input type="number" id="m-s-pct" placeholder="e.g. 10" min="1" max="50" step="0.5"></div>
-    <div class="tmuted" style="margin-top:4px;font-size:12px">e.g. 10 = director earns 10% of net weekly revenue. Super (+12%) applied on top.</div></div>
+    <div class="tmuted" style="margin-top:4px;font-size:12px">e.g. 10 = director earns 10% of net weekly revenue. Super applied on top.</div></div>
     <div class="bgrp"><button class="btn btn-p" id="btn-save-staff">Save</button><button class="btn btn-g" id="btn-cancel-staff">Cancel</button></div>
   </div>
 </div>
@@ -1175,7 +1179,13 @@ const RATES = {
   parttime: [1.00,1.00,1.00,1.00,1.00,1.50,1.75,2.50],
   fulltime: [1.00,1.00,1.00,1.00,1.00,1.50,1.75,2.50]
 };
-const SUPER = 0.12;
+let SUPER = 0.12;
+// $/hr for day index i (0-4 Mon-Fri, 5 Sat, 6 Sun) using the staff's own entered rates.
+// Falls back to an Award-multiplier estimate for staff saved before weekendRate existed.
+function dayRate(s, i) {
+  if (i >= 5) return s.weekendRate != null ? s.weekendRate : s.rate * (RATES[s.type]||RATES.casual)[i];
+  return s.rate;
+}
 const FOOD_CATS = [
   { id:'protein', label:'🥩 Protein',    desc:'meat, chicken, pork, duck', lo:10, hi:16 },
   { id:'seafood', label:'🦐 Seafood',    desc:'prawns, fish, squid',        lo:3,  hi:7  },
@@ -1367,8 +1377,7 @@ function calcLabForWeek(wk) {
   (S.staff||[]).forEach(s => {
     if (s.type === 'director') { wage += netRev * (s.ratePct/100); return; }
     const hrs = (w.lab||{})[s.id] || [];
-    const r = RATES[s.type] || RATES.casual;
-    hrs.forEach((h,i) => { wage += (h||0)*s.rate*r[i]; });
+    hrs.forEach((h,i) => { wage += (h||0)*dayRate(s,i); });
   });
   return { total: wage + wage*SUPER };
 }
@@ -1823,6 +1832,8 @@ function saveSetup() {
   S.setup.cashFloat  = num('s-cashfloat', 130);
   S.setup.gstEnabled  = document.getElementById('s-gst').checked;
   S.setup.foodGstPct  = num('s-food-gst-pct', 10);
+  S.setup.superPct    = num('s-super', 12);
+  SUPER = S.setup.superPct / 100;
   S.setup.rent  = num('c-rent', 0);
   S.setup.util  = num('c-util', 0);
   S.setup.ins   = num('c-ins', 0);
@@ -1833,6 +1844,8 @@ function saveSetup() {
   T('s-total-fixed', fmt(tot));
   T('h-name', S.setup.name);
   persist();
+  renderStaffTable();
+  renderLabTables();
   updateAll();
   const fb = document.getElementById('save-feedback');
   fb.textContent = '✓ Saved';
@@ -1842,9 +1855,12 @@ function loadSetup() {
   const s = S.setup;
   if (s.gstEnabled === undefined) s.gstEnabled = true; // default for existing data
   if (s.foodGstPct === undefined) s.foodGstPct = 10;  // default: 90% GST-free ingredients
+  if (s.superPct === undefined) s.superPct = 12;      // default: current Super Guarantee rate
+  SUPER = s.superPct / 100;
   sv('s-name', s.name);
   sv('s-fc', s.fc);
   sv('s-lc', s.lc);
+  sv('s-super', s.superPct);
   const gstEl = document.getElementById('s-gst');
   if (gstEl) gstEl.checked = s.gstEnabled;
   sv('s-food-gst-pct', s.foodGstPct !== undefined ? s.foodGstPct : 10);
@@ -1865,7 +1881,7 @@ function loadSetup() {
 //  STAFF
 // ─────────────────────────────────────────────
 function openStaffModal() {
-  sv('m-s-name',''); sv('m-s-rate',''); sv('m-s-pct','');
+  sv('m-s-name',''); sv('m-s-rate',''); sv('m-s-weekend-rate',''); sv('m-s-pct','');
   document.getElementById('m-s-type').selectedIndex = 0;
   document.getElementById('m-s-rate-row').style.display = '';
   document.getElementById('m-s-pct-row').style.display = 'none';
@@ -1881,8 +1897,10 @@ function saveStaff() {
     S.staff.push({ id: Date.now(), name, type: 'director', ratePct });
   } else {
     const rate = parseFloat(V('m-s-rate'));
-    if (isNaN(rate) || rate <= 0) return toast('Please enter a valid hourly rate');
-    S.staff.push({ id: Date.now(), name, type, rate });
+    const weekendRate = parseFloat(V('m-s-weekend-rate'));
+    if (isNaN(rate) || rate <= 0) return toast('Please enter a valid Mon–Fri rate');
+    if (isNaN(weekendRate) || weekendRate <= 0) return toast('Please enter a valid Weekend rate');
+    S.staff.push({ id: Date.now(), name, type, rate, weekendRate });
   }
   persist();
   renderStaffTable();
@@ -1910,6 +1928,17 @@ function updateStaffRate(id, val) {
   updateAll();
 }
 
+function updateStaffWeekendRate(id, val) {
+  const s = S.staff.find(x => x.id === id);
+  if (!s) return;
+  const rate = parseFloat(val);
+  s.weekendRate = isNaN(rate) ? 0 : rate;
+  persist();
+  renderStaffTable();
+  renderLabTables();
+  updateAll();
+}
+
 function updateStaffPct(id, val) {
   const s = S.staff.find(x => x.id === id);
   if (!s) return;
@@ -1922,25 +1951,25 @@ function updateStaffPct(id, val) {
 }
 function renderStaffTable() {
   const tb = document.getElementById('staff-body');
-  if (!S.staff.length) { tb.innerHTML = '<tr><td colspan="8" style="color:var(--tm);text-align:center;padding:18px">No staff added yet.</td></tr>'; return; }
+  if (!S.staff.length) { tb.innerHTML = '<tr><td colspan="6" style="color:var(--tm);text-align:center;padding:18px">No staff added yet.</td></tr>'; return; }
   tb.innerHTML = S.staff.map(s => {
     if (s.type === 'director') {
       return `<tr>
         <td><strong>${esc(s.name)}</strong></td>
         <td><span class="badge by">director</span></td>
-        <td colspan="5" style="color:var(--y)"><input class="tdinput" type="number" min="1" max="50" step="0.5" value="${s.ratePct}" data-pct-staff="${s.id}" style="width:70px">% of weekly net revenue + 12% super</td>
+        <td colspan="3" style="color:var(--y)"><input class="tdinput" type="number" min="1" max="50" step="0.5" value="${s.ratePct}" data-pct-staff="${s.id}" style="width:70px">% of weekly net revenue + ${(SUPER*100).toFixed(0)}% super</td>
         <td><button class="btn btn-d btn-sm" data-del-staff="${s.id}">✕</button></td>
       </tr>`;
     }
     const r = RATES[s.type] || RATES.casual;
+    const weekendRate = s.weekendRate != null ? s.weekendRate : +(s.rate*r[5]).toFixed(2);
+    const phRate = weekendRate * (r[7] / r[6]);
     return `<tr>
       <td><strong>${esc(s.name)}</strong></td>
       <td><span class="badge ${s.type==='casual'?'bo':'bb'}">${s.type}</span></td>
       <td><input class="tdinput" type="number" min="24.95" step="0.05" value="${s.rate}" data-rate-staff="${s.id}" style="width:80px"></td>
-      <td class="mono">$${(s.rate*r[0]).toFixed(2)}</td>
-      <td class="mono" style="color:var(--y)">$${(s.rate*r[5]).toFixed(2)}</td>
-      <td class="mono" style="color:var(--p)">$${(s.rate*r[6]).toFixed(2)}</td>
-      <td class="mono" style="color:var(--r)">$${(s.rate*r[7]).toFixed(2)}</td>
+      <td><input class="tdinput" type="number" min="24.95" step="0.05" value="${weekendRate}" data-weekend-rate-staff="${s.id}" style="width:80px"></td>
+      <td class="mono tmuted" title="Reference only — not used in wage calculations">$${phRate.toFixed(2)}</td>
       <td><button class="btn btn-d btn-sm" data-del-staff="${s.id}">✕</button></td>
     </tr>`;
   }).join('');
@@ -1983,11 +2012,10 @@ function renderLabTables() {
     // Hourly staff
     if (!wd.lab[s.id]) wd.lab[s.id] = [0,0,0,0,0,0,0];
     const hrs = wd.lab[s.id];
-    const r = RATES[s.type] || RATES.casual;
     let wage = 0;
     const cells = DAYS.map((day, i) => {
       const h = hrs[i] || 0;
-      wage += h * s.rate * r[i];
+      wage += h * dayRate(s,i);
       return `<td style="padding:5px"><input class="tdinput" type="number" min="0" max="18" step="0.5" value="${h||''}" placeholder="0" data-sid="${s.id}" data-di="${i}"></td>`;
     }).join('');
     const sup = wage * SUPER;
@@ -1996,7 +2024,7 @@ function renderLabTables() {
         <div style="display:flex;align-items:center;gap:8px">
           <strong>${esc(s.name)}</strong>
           <span class="badge ${s.type==='casual'?'bo':'bb'}">${s.type}</span>
-          <span class="tmuted" style="font-size:12px">$${s.rate.toFixed(2)}/hr base</span>
+          <span class="tmuted" style="font-size:12px">$${s.rate.toFixed(2)}/hr Mon–Fri · $${dayRate(s,5).toFixed(2)}/hr weekend</span>
         </div>
         <div style="text-align:right">
           <span style="font-size:16px;font-weight:700;font-family:monospace" data-lab-total="${s.id}">${fmt(wage+sup)}</span>
@@ -2023,9 +2051,8 @@ function updateLabHour(sid, di, val) {
   persist();
   const s = S.staff.find(x => x.id === sid);
   if (!s || s.type === 'director') { updateLabSummary(); updateAll(); return; }
-  const r = RATES[s.type] || RATES.casual;
   const hrs = wd.lab[sid];
-  let wage = hrs.reduce((a,h,i) => a + (h||0)*s.rate*r[i], 0);
+  let wage = hrs.reduce((a,h,i) => a + (h||0)*dayRate(s,i), 0);
   const sup = wage * SUPER;
   const totEl = document.querySelector(`[data-lab-total="${sid}"]`);
   if (totEl) { totEl.textContent = fmt(wage + sup); totEl.nextElementSibling.textContent = `incl. $${sup.toFixed(2)} super`; }
@@ -2043,9 +2070,8 @@ function calcLabTotals() {
       return;
     }
     const hrs = wd.lab[s.id] || [];
-    const r = RATES[s.type] || RATES.casual;
     hrs.forEach((h,i) => {
-      const p = (h||0)*s.rate*r[i];
+      const p = (h||0)*dayRate(s,i);
       wage += p;
       if (i >= 5) pen += p - (h||0)*s.rate;
     });
@@ -2062,6 +2088,7 @@ function updateLabSummary() {
   T('lab-tot-v', fmt(total));
   T('lab-tot-s', net > 0 ? pct.toFixed(1)+'% of net revenue (target: '+tgt+'%)' : 'Enter revenue in Dashboard');
   T('lab-sup-v', fmt(sup));
+  T('lab-sup-s', (SUPER*100).toFixed(1).replace(/\.0$/,'')+'% Superannuation');
   T('lab-pen-v', fmt(pen));
   const card = document.getElementById('lab-tot-stat');
   card.className = 'stat ' + colorClass(pct, tgt);
@@ -3053,8 +3080,8 @@ function renderTrend() {
     let labWage = 0;
     S.staff.forEach(st => {
       if (st.type==='director') { labWage += net*(st.ratePct/100); return; }
-      const hrs=(wd.lab||{})[st.id]||[]; const r=RATES[st.type]||RATES.casual;
-      hrs.forEach((h,i)=>{labWage+=(h||0)*st.rate*r[i];});
+      const hrs=(wd.lab||{})[st.id]||[];
+      hrs.forEach((h,i)=>{labWage+=(h||0)*dayRate(st,i);});
     });
     const labTot = labWage*(1+SUPER);
     const food = wd.food||0;
@@ -3725,7 +3752,7 @@ function renderDailyBudgetGuide() {
 
   function avgEffectiveRate(dayIdx) {
     if (!hourlyStaff.length) return 25 * (RATES.casual[dayIdx] || 1.25);
-    const total = hourlyStaff.reduce((sum, s) => sum + s.rate * (RATES[s.type] || RATES.casual)[dayIdx], 0);
+    const total = hourlyStaff.reduce((sum, s) => sum + dayRate(s, dayIdx), 0);
     return total / hourlyStaff.length;
   }
 
@@ -3741,7 +3768,7 @@ function renderDailyBudgetGuide() {
     hourlyStaff.forEach(s => {
       const h = ((rp.lab[s.id] || [])[i]) || 0;
       plannedHrs  += h;
-      plannedCost += h * s.rate * (RATES[s.type] || RATES.casual)[i] * (1 + SUPER);
+      plannedCost += h * dayRate(s,i) * (1 + SUPER);
     });
 
     const fillPct  = maxHrs > 0 ? Math.min(plannedHrs / maxHrs * 100, 100) : 0;
@@ -3836,13 +3863,12 @@ function renderRosterTab() {
     const isDir = s.type === 'director';
     const shifts = rp.shifts[s.id] || [];
     let totalHrs = 0, totalCost = 0;
-    const r = isDir ? null : (RATES[s.type]||RATES.casual);
 
     const cells = DAYS.map((_,i) => {
       const slots = (shifts[i]||[]);
       const dayHrs = slots.reduce((a,sh)=>a+shiftHrs(sh.s,sh.e),0);
       totalHrs += dayHrs;
-      if (!isDir && r) totalCost += dayHrs > 0 ? (rp.lab[s.id]||[])[i]||0 : 0;
+      if (!isDir) totalCost += dayHrs > 0 ? (rp.lab[s.id]||[])[i]||0 : 0;
 
       const isWknd=i>=5;
       const bg  = i===6?'rgba(232,93,38,.08)':i===5?'rgba(245,158,11,.08)':'transparent';
@@ -3863,9 +3889,9 @@ function renderRosterTab() {
     }).join('');
 
     // Recalc cost from lab array for non-director
-    if (!isDir && r) {
+    if (!isDir) {
       totalCost = 0;
-      for(let i=0;i<7;i++) totalCost += ((rp.lab[s.id]||[])[i]||0) * s.rate * r[i] * (1+SUPER);
+      for(let i=0;i<7;i++) totalCost += ((rp.lab[s.id]||[])[i]||0) * dayRate(s,i) * (1+SUPER);
     }
 
     const badge = isDir
@@ -3897,8 +3923,7 @@ function updateRosterHour(sid, di, val) {
   rp.lab[sid][di] = parseFloat(val)||0;
   const s = S.staff.find(x=>x.id===sid);
   if (s && s.type !== 'director') {
-    const r = RATES[s.type]||RATES.casual;
-    const wage = rp.lab[sid].reduce((a,h,i)=>a+(h||0)*s.rate*r[i],0);
+    const wage = rp.lab[sid].reduce((a,h,i)=>a+(h||0)*dayRate(s,i),0);
     const totEl = document.querySelector(`[data-r-tot="${sid}"]`);
     if (totEl) totEl.textContent = fmt(wage*(1+SUPER));
   }
@@ -3913,12 +3938,13 @@ function calcRosterEstimate() {
   let labTot=0, totalHrs=0;
   S.staff.forEach(s => {
     if (s.type === 'director') { labTot += tRev * (s.ratePct/100) * (1+SUPER); return; }
-    const hrs=rp.lab[s.id]||[]; const r=RATES[s.type]||RATES.casual;
-    labTot += hrs.reduce((a,h,i)=>a+(h||0)*s.rate*r[i],0)*(1+SUPER);
+    const hrs=rp.lab[s.id]||[];
+    labTot += hrs.reduce((a,h,i)=>a+(h||0)*dayRate(s,i),0)*(1+SUPER);
     totalHrs += hrs.reduce((a,b)=>(a||0)+(b||0),0);
   });
   const lcTgt = S.setup.lc||32;
   T('r-est-lab', fmt(labTot));
+  T('r-est-lab-s', 'incl. '+(SUPER*100).toFixed(1).replace(/\.0$/,'')+'% super');
   T('r-est-hrs', totalHrs.toFixed(1)+' h');
   if (tRev > 0) {
     const pct = labTot/tRev*100; const diff = pct - lcTgt;
@@ -4716,7 +4742,7 @@ function exportAllCSV() {
     const di=(wd.rev||[]).reduce((a,b)=>(a||0)+(b||0),0);
     const del=(wd.del||[]).reduce((a,b)=>(a||0)+(b||0),0);
     const fee=del*0.33, gross=di+del, net=gross-fee;
-    let lw=0; S.staff.forEach(st=>{ if(st.type==='director'){lw+=net*(st.ratePct/100);return;} const hrs=(wd.lab||{})[st.id]||[];const r=RATES[st.type]||RATES.casual;hrs.forEach((h,i)=>{lw+=(h||0)*st.rate*r[i];});});
+    let lw=0; S.staff.forEach(st=>{ if(st.type==='director'){lw+=net*(st.ratePct/100);return;} const hrs=(wd.lab||{})[st.id]||[];hrs.forEach((h,i)=>{lw+=(h||0)*dayRate(st,i);});});
     const lt=lw*(1+SUPER), food=wd.food||0;
     const lp=net>0?(lt/net*100).toFixed(1):0, fp=net>0?(food/net*100).toFixed(1):0;
     const pp=net>0?((lt+food)/net*100).toFixed(1):0, prf=net-lt-food-fixed;
@@ -4750,9 +4776,9 @@ function printWeeklyReport() {
       const sw = netRev * (st.ratePct/100); const ss = sw*SUPER;
       return `<tr><td>${esc(st.name)}</td><td>Director</td><td style="text-align:right">—</td><td style="text-align:right">${st.ratePct}% rev</td><td style="text-align:right">${fa(sw)}</td><td style="text-align:right">${fa(ss)}</td><td style="text-align:right;font-weight:700">${fa(sw+ss)}</td></tr>`;
     }
-    const hrs=(wd.lab||{})[st.id]||[]; const r=RATES[st.type]||RATES.casual;
+    const hrs=(wd.lab||{})[st.id]||[];
     let sw=0; const th=hrs.reduce((a,b)=>(a||0)+(b||0),0);
-    hrs.forEach((h,i)=>{sw+=(h||0)*st.rate*r[i];});
+    hrs.forEach((h,i)=>{sw+=(h||0)*dayRate(st,i);});
     const ss=sw*SUPER;
     return `<tr><td>${esc(st.name)}</td><td>${st.type}</td><td style="text-align:right">${th.toFixed(1)}</td><td style="text-align:right">$${st.rate.toFixed(2)}</td><td style="text-align:right">${fa(sw)}</td><td style="text-align:right">${fa(ss)}</td><td style="text-align:right;font-weight:700">${fa(sw+ss)}</td></tr>`;
   }).join('')||'<tr><td colspan="7" style="text-align:center;color:#888">No labour data</td></tr>';
@@ -4784,14 +4810,14 @@ function printWeeklyReport() {
 <tr><td style="padding-left:14px">Food & Beverage Cost</td><td class="mono red">−${fa(food)}</td><td class="mono ${foodPct>(s.fc||30)+3?'red':foodPct>(s.fc||30)?'':'green'}">${netRev>0?fp(foodPct):'—'} <span style="color:#888;font-size:10px">(tgt ${s.fc||30}%)</span></td></tr>
 <tr><td style="padding-left:14px">Labour (incl. Super)</td><td class="mono red">−${fa(labTot)}</td><td class="mono ${labPct>(s.lc||32)+3?'red':labPct>(s.lc||32)?'':'green'}">${netRev>0?fp(labPct):'—'} <span style="color:#888;font-size:10px">(tgt ${s.lc||32}%)</span></td></tr>
 <tr><td style="padding-left:28px;color:#888;font-size:11px">Wages</td><td class="mono" style="color:#888;font-size:11px">−${fa(wage)}</td><td></td></tr>
-<tr><td style="padding-left:28px;color:#888;font-size:11px">Superannuation (12%)</td><td class="mono" style="color:#888;font-size:11px">−${fa(sup)}</td><td></td></tr>
+<tr><td style="padding-left:28px;color:#888;font-size:11px">Superannuation (${(SUPER*100).toFixed(1).replace(/\.0$/,'')}%)</td><td class="mono" style="color:#888;font-size:11px">−${fa(sup)}</td><td></td></tr>
 <tr><td style="padding-left:14px">Fixed Overhead</td><td class="mono red">−${fa(fixed)}</td><td class="mono">${netRev>0?fp(fixed/netRev*100):'—'}</td></tr>
 <tr style="background:${profit>=0?'#f0fdf4':'#fef2f2'};border-top:2px solid #ccc"><td><strong>Net ${profit>=0?'Profit':'Loss'}</strong></td><td class="mono ${profit>=0?'green':'red'}"><strong>${profit>=0?'':'-'}${fa(Math.abs(profit))}</strong></td><td class="mono ${profit>=0?'green':'red'}">${netRev>0?fp(Math.abs(profit/netRev*100)):'—'}</td></tr>
 </tbody></table></div>
 <div class="sec"><div class="sec-title">Labour Detail</div><table>
 <thead><tr><th>Staff</th><th>Type</th><th class="rt">Hours</th><th class="rt">Base Rate</th><th class="rt">Wages</th><th class="rt">Super</th><th class="rt">Total</th></tr></thead>
 <tbody>${staffRows}<tr style="background:#f4f4f4;font-weight:700;border-top:2px solid #ccc"><td colspan="4">Total Labour</td><td class="mono">${fa(wage)}</td><td class="mono">${fa(sup)}</td><td class="mono">${fa(labTot)}</td></tr></tbody>
-</table><div style="font-size:10px;color:#888;margin-top:6px">Award MA000119. Casual Mon–Fri 125%, Sat 175%, Sun 200%, PH 275% | Part-time Mon–Fri 100%, Sat 150%, Sun 175%, PH 250% | Super +12%</div></div>
+</table><div style="font-size:10px;color:#888;margin-top:6px">Rates as entered per staff member in Setup → Staff Roster. Super applied at ${(SUPER*100).toFixed(1).replace(/\.0$/,'')}%.</div></div>
 ${s.gstEnabled!==false?`<div class="sec"><div class="sec-title">GST Summary (ATO)</div><div class="gst"><table>
 <thead><tr><th>Item</th><th class="rt">Amount</th><th>Notes</th></tr></thead><tbody>
 <tr><td>GST Collected (1/11 of gross)</td><td class="mono blue">${fa(gstC)}</td><td style="font-size:11px;color:#555">Collected from customers</td></tr>
@@ -5396,8 +5422,10 @@ function init() {
   // ── Staff table: edit wage rate / director % via delegation ──
   document.getElementById('staff-body').addEventListener('change', function(e) {
     const rateId = e.target.dataset.rateStaff;
+    const weekendRateId = e.target.dataset.weekendRateStaff;
     const pctId = e.target.dataset.pctStaff;
     if (rateId !== undefined) updateStaffRate(parseInt(rateId), e.target.value);
+    else if (weekendRateId !== undefined) updateStaffWeekendRate(parseInt(weekendRateId), e.target.value);
     else if (pctId !== undefined) updateStaffPct(parseInt(pctId), e.target.value);
   });
 
